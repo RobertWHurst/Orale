@@ -141,11 +141,38 @@ func TestLoad(t *testing.T) {
 		}
 	})
 
-	t.Run("should load configuration files for a specific environment", func(t *testing.T) {
+	t.Run("should load configuration files for a specific environment when environment is set as a flag", func(t *testing.T) {
 		orale.Test_SetArgs([]string{
 			"--config-environment", "test",
 		})
 		defer orale.Test_SetArgs([]string{})
+
+		type TestConfig struct {
+			TestVal1 int `config:"test_val_1"`
+			TestVal2 int `config:"test_val_2"`
+		}
+
+		conf, err := orale.Load("testApplication")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		testConf := TestConfig{}
+		conf.MustGet("", &testConf)
+
+		if testConf.TestVal1 != 10 {
+			t.Fatalf("expected TestVal1 to be 10, got %d", testConf.TestVal1)
+		}
+		if testConf.TestVal2 != 20 {
+			t.Fatalf("expected TestVal2 to be 20, got %d", testConf.TestVal2)
+		}
+	})
+
+	t.Run("should load configuration files for a specific environment when environment is set as an environment variable", func(t *testing.T) {
+		orale.Test_SetEnvironment([]string{
+			"TEST_APPLICATION__CONFIG_ENVIRONMENT=test",
+		})
+		defer orale.Test_SetEnvironment([]string{})
 
 		type TestConfig struct {
 			TestVal1 int `config:"test_val_1"`
