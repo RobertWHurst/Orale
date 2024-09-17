@@ -10,10 +10,6 @@ import (
 
 const configEnvironmentKey = "config_environment"
 
-var testWorkingDir string
-var testArgs []string
-var testEnvironment []string
-
 // Load loads configuration values from flags, environment variables, and
 // configuration files. Flags are taken from `os.Args[1:]`. Environment
 // variables are taken from `os.Environ()`. Configuration files are taken from
@@ -257,13 +253,19 @@ func loadConfigurationFiles(environmentName string, startPath string, configName
 	return configFiles, nil
 }
 
+var testWorkingDir string
+
 func Test_SetWorkingDir(dir string) {
 	testWorkingDir = dir
 }
 
+var testArgs []string
+
 func Test_SetArgs(args []string) {
 	testArgs = args
 }
+
+var testEnvironment []string
 
 func Test_SetEnvironment(env []string) {
 	testEnvironment = env
