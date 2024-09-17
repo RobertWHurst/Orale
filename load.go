@@ -8,6 +8,12 @@ import (
 	"unicode"
 )
 
+const configEnvironmentKey = "config_environment"
+
+var testWorkingDir string
+var testArgs []string
+var testEnvironment []string
+
 // Load loads configuration values from flags, environment variables, and
 // configuration files. Flags are taken from `os.Args[1:]`. Environment
 // variables are taken from `os.Environ()`. Configuration files are taken from
@@ -15,9 +21,15 @@ import (
 // name is the application name with the extension `.config.toml`. If the name
 // contain
 func Load(applicationName string) (*Loader, error) {
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	var workingDir string
+	if testWorkingDir != "" {
+		workingDir = testWorkingDir
+	} else {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		workingDir = dir
 	}
 
 	applicationNameRunes := []rune(applicationName)
@@ -63,16 +75,32 @@ func Load(applicationName string) (*Loader, error) {
 		}
 	}
 	configName := string(configNameRunes)
-	configName = fmt.Sprintf("%s.config.toml", configName)
+
+	var args []string
+	if testArgs != nil {
+		args = testArgs
+	} else {
+		args = os.Args[1:]
+	}
+
+	var envVars []string
+	if testEnvironment != nil {
+		envVars = testEnvironment
+	} else {
+		envVars = os.Environ()
+	}
 
 	return LoadFromValues(
-		os.Args[1:],
+		args,
 		envPrefix,
-		os.Environ(),
+		envVars,
 		workingDir,
 		[]string{configName},
 	)
 }
+
+// --config-environment=production
+// APP_NAME__CONFIG_ENVIRONMENT=production
 
 // LoadFromValues works like Load, but allows the caller to specify configuration
 // such as flag and environment values, as well as which path to start searching
@@ -80,7 +108,8 @@ func Load(applicationName string) (*Loader, error) {
 func LoadFromValues(programArgs []string, envVarPrefix string, envVars []string, configSearchStartPath string, configFileNames []string) (*Loader, error) {
 	flagValues := loadFlags(programArgs)
 	environmentValues := loadEnvironment(envVarPrefix, envVars)
-	configurationFiles, err := loadConfigurationFiles(configSearchStartPath, configFileNames)
+	environmentName := extractEnvironmentName(flagValues, environmentValues)
+	configurationFiles, err := loadConfigurationFiles(environmentName, configSearchStartPath, configFileNames)
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +125,14 @@ func LoadFromValues(programArgs []string, envVarPrefix string, envVars []string,
 // would be appropriate
 func loadFlags(programArgs []string) map[string][]any {
 	flagValues := map[string][]any{}
-	// short flags
+
+	previousFlag := ""
 	for _, arg := range programArgs {
+		if previousFlag != "" {
+			arg = previousFlag + "=" + arg
+			previousFlag = ""
+		}
+
 		isShortFlag := arg[0] == '-' && arg[1] != '-'
 		isFlag := !isShortFlag && arg[0:2] == "--"
 
@@ -119,6 +154,7 @@ func loadFlags(programArgs []string) map[string][]any {
 			}
 		}
 		if splitIndex == -1 {
+			previousFlag = arg
 			continue
 		}
 
@@ -175,7 +211,21 @@ func loadEnvironment(variablePrefix string, envVariables []string) map[string][]
 	return environmentValues
 }
 
-func loadConfigurationFiles(startPath string, configNames []string) ([]*File, error) {
+func extractEnvironmentName(flagValues map[string][]any, environmentValues map[string][]any) string {
+	for key, values := range flagValues {
+		if key == configEnvironmentKey {
+			return values[0].(string)
+		}
+	}
+	for key, values := range environmentValues {
+		if key == configEnvironmentKey {
+			return values[0].(string)
+		}
+	}
+	return ""
+}
+
+func loadConfigurationFiles(environmentName string, startPath string, configNames []string) ([]*File, error) {
 	currentPathChunks := strings.Split(startPath, string(filepath.Separator))
 
 	configFiles := []*File{}
@@ -187,7 +237,14 @@ func loadConfigurationFiles(startPath string, configNames []string) ([]*File, er
 		}
 
 		for _, configName := range configNames {
-			maybeConfigFilePath := filepath.Join(currentPath, configName)
+			fullConfigName := ""
+			if environmentName == "" {
+				fullConfigName = fmt.Sprintf("%s.config.toml", configName)
+			} else {
+				fullConfigName = fmt.Sprintf("%s.%s.config.toml", configName, environmentName)
+			}
+
+			maybeConfigFilePath := filepath.Join(currentPath, fullConfigName)
 			maybeConfigFile, err := maybeLoadFile(maybeConfigFilePath)
 			if err != nil {
 				return nil, err
@@ -201,4 +258,16 @@ func loadConfigurationFiles(startPath string, configNames []string) ([]*File, er
 	}
 
 	return configFiles, nil
+}
+
+func Test_SetWorkingDir(dir string) {
+	testWorkingDir = dir
+}
+
+func Test_SetArgs(args []string) {
+	testArgs = args
+}
+
+func Test_SetEnvironment(env []string) {
+	testEnvironment = env
 }
