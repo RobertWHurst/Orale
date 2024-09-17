@@ -18,6 +18,18 @@ func TestLoad(t *testing.T) {
 	os.Chdir(testAssetsPath)
 
 	t.Run("should load flags, environment variables, and configuration files, then correctly assign them to a struct", func(t *testing.T) {
+		orale.Test_SetArgs([]string{
+			"--oh--simple-as=Do",
+			"--oh--simple-as=Re",
+			"--oh--simple-as=Mi",
+		})
+		defer orale.Test_SetArgs([]string{})
+
+		orale.Test_SetEnvironment([]string{
+			"TEST_APPLICATION__ABC_123_BABY_YOU_AND_ME_GIRL=true",
+		})
+		defer orale.Test_SetEnvironment([]string{})
+
 		type TestConfig struct {
 			A    string `config:"a"`
 			Easy *struct {
@@ -27,9 +39,14 @@ func TestLoad(t *testing.T) {
 				Baby string `config:"baby"`
 				And  string `config:"and"`
 			} `config:"abc"`
+			Oh struct {
+				SimpleAs []string `config:"simple_as"`
+			} `config:"oh"`
+			// ABC, 123 baby you and me girl.
+			Abc123BabyYouAndMeGirl bool `config:"abc_123_baby_you_and_me_girl"`
 		}
 
-		conf, err := orale.Load("test-application")
+		conf, err := orale.Load("testApplication")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,6 +86,112 @@ func TestLoad(t *testing.T) {
 		}
 		if testConf.Abc[1].And != "me" {
 			t.Fatalf("expected Abc[1].And to be me, got %s", testConf.Abc[1].And)
+		}
+		if len(testConf.Oh.SimpleAs) != 3 {
+			t.Fatalf("expected Oh.SimpleAs to have 3 values, got %d", len(testConf.Oh.SimpleAs))
+		}
+		if testConf.Oh.SimpleAs[0] != "Do" {
+			t.Fatalf("expected Oh.SimpleAs[0] to be Do, got %s", testConf.Oh.SimpleAs[0])
+		}
+		if testConf.Oh.SimpleAs[1] != "Re" {
+			t.Fatalf("expected Oh.SimpleAs[1] to be Re, got %s", testConf.Oh.SimpleAs[1])
+		}
+		if testConf.Oh.SimpleAs[2] != "Mi" {
+			t.Fatalf("expected Oh.SimpleAs[2] to be Mi, got %s", testConf.Oh.SimpleAs[2])
+		}
+		if !testConf.Abc123BabyYouAndMeGirl {
+			t.Fatalf("expected Abc123BabyYouAndMeGirl to be true")
+		}
+	})
+
+	t.Run("should load flags that are space delimited", func(t *testing.T) {
+		orale.Test_SetArgs([]string{
+			"--foo", "foo",
+			"--foo", "bar",
+			"--foo", "baz",
+		})
+		defer orale.Test_SetArgs([]string{})
+
+		type TestConfig struct {
+			Foo []string `config:"foo"`
+		}
+
+		conf, err := orale.Load("testApplication")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		testConf := TestConfig{}
+		conf.MustGet("", &testConf)
+
+		if len(testConf.Foo) != 3 {
+			t.Fatalf("expected A to have 3 values, got %d", len(testConf.Foo))
+		}
+
+		if testConf.Foo[0] != "foo" {
+			t.Fatalf("expected A[0] to be 1, got %s", testConf.Foo[0])
+		}
+
+		if testConf.Foo[1] != "bar" {
+			t.Fatalf("expected A[1] to be 2, got %s", testConf.Foo[1])
+		}
+
+		if testConf.Foo[2] != "baz" {
+			t.Fatalf("expected A[2] to be 3, got %s", testConf.Foo[2])
+		}
+	})
+
+	t.Run("should load configuration files for a specific environment when environment is set as a flag", func(t *testing.T) {
+		orale.Test_SetArgs([]string{
+			"--config-environment", "test",
+		})
+		defer orale.Test_SetArgs([]string{})
+
+		type TestConfig struct {
+			TestVal1 int `config:"test_val_1"`
+			TestVal2 int `config:"test_val_2"`
+		}
+
+		conf, err := orale.Load("testApplication")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		testConf := TestConfig{}
+		conf.MustGet("", &testConf)
+
+		if testConf.TestVal1 != 10 {
+			t.Fatalf("expected TestVal1 to be 10, got %d", testConf.TestVal1)
+		}
+		if testConf.TestVal2 != 20 {
+			t.Fatalf("expected TestVal2 to be 20, got %d", testConf.TestVal2)
+		}
+	})
+
+	t.Run("should load configuration files for a specific environment when environment is set as an environment variable", func(t *testing.T) {
+		orale.Test_SetEnvironment([]string{
+			"TEST_APPLICATION__CONFIG_ENVIRONMENT=test",
+		})
+		defer orale.Test_SetEnvironment([]string{})
+
+		type TestConfig struct {
+			TestVal1 int `config:"test_val_1"`
+			TestVal2 int `config:"test_val_2"`
+		}
+
+		conf, err := orale.Load("testApplication")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		testConf := TestConfig{}
+		conf.MustGet("", &testConf)
+
+		if testConf.TestVal1 != 10 {
+			t.Fatalf("expected TestVal1 to be 10, got %d", testConf.TestVal1)
+		}
+		if testConf.TestVal2 != 20 {
+			t.Fatalf("expected TestVal2 to be 20, got %d", testConf.TestVal2)
 		}
 	})
 }
@@ -143,8 +266,8 @@ func TestLoadFromValues(t *testing.T) {
 
 		configSearchStartPath := filepath.Join(testAssetsPath, "search-dir")
 		configFileNames := []string{
-			"test-config-1.toml",
-			"test-config-2.toml",
+			"test-1",
+			"test-2",
 		}
 
 		conf, err := orale.LoadFromValues([]string{}, "", []string{}, configSearchStartPath, configFileNames)
@@ -156,8 +279,8 @@ func TestLoadFromValues(t *testing.T) {
 			t.Fatalf("expected 2 configuration files, got %d", len(conf.ConfigurationFiles))
 		}
 
-		config1Path := filepath.Join(testAssetsPath, "search-dir/test-config-1.toml")
-		config2Path := filepath.Join(testAssetsPath, "test-config-2.toml")
+		config1Path := filepath.Join(testAssetsPath, "search-dir/test-1.config.toml")
+		config2Path := filepath.Join(testAssetsPath, "test-2.config.toml")
 
 		if len(conf.ConfigurationFiles) != 2 {
 			t.Fatalf("expected 2 values in test_config, got %d", len(conf.ConfigurationFiles))

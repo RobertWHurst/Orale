@@ -294,7 +294,7 @@ func resolvePathLen(l *Loader, targetPath string) (int, error) {
 }
 
 func getSlicePathFromSubjectAndTargetPaths(subjectPath, targetPath string) string {
-	if len(subjectPath) < len(targetPath)+3 {
+	if len(subjectPath) < len(targetPath)+3 || !strings.HasPrefix(subjectPath, targetPath) {
 		return ""
 	}
 	remainingPath := subjectPath[len(targetPath):]
