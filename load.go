@@ -99,9 +99,6 @@ func Load(applicationName string) (*Loader, error) {
 	)
 }
 
-// --config-environment=production
-// APP_NAME__CONFIG_ENVIRONMENT=production
-
 // LoadFromValues works like Load, but allows the caller to specify configuration
 // such as flag and environment values, as well as which path to start searching
 // for configuration files and which configuration file names to look for.
