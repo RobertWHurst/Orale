@@ -40,10 +40,10 @@ func TestLoad(t *testing.T) {
 				And  string `config:"and"`
 			} `config:"abc"`
 			Oh struct {
-				SimpleAs []string `config:"simple_as"`
+				SimpleAs []string `config:"simpleAs"`
 			} `config:"oh"`
 			// ABC, 123 baby you and me girl.
-			Abc123BabyYouAndMeGirl bool `config:"abc_123_baby_you_and_me_girl"`
+			Abc123BabyYouAndMeGirl bool `config:"abc123BabyYouAndMeGirl"`
 		}
 
 		conf, err := orale.Load("testApplication")
@@ -148,8 +148,8 @@ func TestLoad(t *testing.T) {
 		defer orale.Test_SetArgs([]string{})
 
 		type TestConfig struct {
-			TestVal1 int `config:"test_val_1"`
-			TestVal2 int `config:"test_val_2"`
+			TestVal1 int `config:"testVal1"`
+			TestVal2 int `config:"testVal2"`
 		}
 
 		conf, err := orale.Load("testApplication")
@@ -175,8 +175,8 @@ func TestLoad(t *testing.T) {
 		defer orale.Test_SetEnvironment([]string{})
 
 		type TestConfig struct {
-			TestVal1 int `config:"test_val_1"`
-			TestVal2 int `config:"test_val_2"`
+			TestVal1 int `config:"testVal1"`
+			TestVal2 int `config:"testVal2"`
 		}
 
 		conf, err := orale.Load("testApplication")
@@ -289,21 +289,21 @@ func TestLoadFromValues(t *testing.T) {
 		if conf.ConfigurationFiles[0].Path != config1Path {
 			t.Fatalf("expected first configuration file path to be %x, got %x", config1Path, conf.ConfigurationFiles[0].Path)
 		}
-		if conf.ConfigurationFiles[0].Values["test_val_1"][0] != int64(1) {
-			t.Fatalf("expected test_val_1 to be 3, got %s", conf.ConfigurationFiles[0].Values["test_val_1"])
+		if conf.ConfigurationFiles[0].Values["testVal1"][0] != int64(1) {
+			t.Fatalf("expected testVal1 to be 3, got %s", conf.ConfigurationFiles[0].Values["testVal1"])
 		}
-		if conf.ConfigurationFiles[0].Values["test_val_2"][0] != int64(2) {
-			t.Fatalf("expected test_val_3 to be 4, got %s", conf.ConfigurationFiles[0].Values["test_val_2"])
+		if conf.ConfigurationFiles[0].Values["testVal2"][0] != int64(2) {
+			t.Fatalf("expected testVal3 to be 4, got %s", conf.ConfigurationFiles[0].Values["testVal2"])
 		}
 
 		if conf.ConfigurationFiles[1].Path != config2Path {
 			t.Fatalf("expected second configuration file path to be %s, got %s", config2Path, conf.ConfigurationFiles[1].Path)
 		}
-		if conf.ConfigurationFiles[1].Values["test_val_1"][0] != int64(3) {
-			t.Fatalf("expected test_val_1 to be 1, got %s", conf.ConfigurationFiles[1].Values["test_val_1"])
+		if conf.ConfigurationFiles[1].Values["testVal1"][0] != int64(3) {
+			t.Fatalf("expected testVal1 to be 1, got %s", conf.ConfigurationFiles[1].Values["testVal1"])
 		}
-		if conf.ConfigurationFiles[1].Values["test_val_3"][0] != int64(4) {
-			t.Fatalf("expected test_val_2 to be 2, got %s", conf.ConfigurationFiles[1].Values["test_val_3"])
+		if conf.ConfigurationFiles[1].Values["testVal3"][0] != int64(4) {
+			t.Fatalf("expected testVal2 to be 2, got %s", conf.ConfigurationFiles[1].Values["testVal3"])
 		}
 	})
 

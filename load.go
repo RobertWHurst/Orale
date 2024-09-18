@@ -8,7 +8,7 @@ import (
 	"unicode"
 )
 
-const configEnvironmentKey = "config_environment"
+const configEnvironmentKey = "configEnvironment"
 
 // Load loads configuration values from flags, environment variables, and
 // configuration files. Flags are taken from `os.Args[1:]`. Environment
@@ -157,7 +157,7 @@ func loadFlags(programArgs []string) map[string][]any {
 		key = strings.ToLower(key)
 		key = strings.Replace(key, ".", "\\.", -1)
 		key = strings.Replace(key, "--", ".", -1)
-		key = strings.Replace(key, "-", "_", -1)
+		key = toCamelCase(key)
 
 		if _, ok := flagValues[key]; !ok {
 			flagValues[key] = []any{}
@@ -193,6 +193,7 @@ func loadEnvironment(variablePrefix string, envVariables []string) map[string][]
 			key = strings.ToLower(key)
 			key = strings.Replace(key, ".", "\\.", -1)
 			key = strings.Replace(key, "__", ".", -1)
+			key = toCamelCase(key)
 
 			if _, ok := environmentValues[key]; !ok {
 				environmentValues[key] = []any{}

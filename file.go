@@ -54,6 +54,7 @@ func flattenFileValues(pathChunks []string, hierarchicalValues map[string]any, f
 
 	// TODO: deal with slice indexes
 	for key, value := range hierarchicalValues {
+		key := toCamelCase(key)
 		keyPathChunks := append(pathChunks, key)
 		keyPath := strings.Join(keyPathChunks, ".")
 

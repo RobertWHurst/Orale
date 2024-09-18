@@ -117,9 +117,11 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			if fieldTag == "" {
 				fieldTag = calDefaultFieldTag(structField.Name)
 			}
-			fieldPath := fieldTag
+			var fieldPath string
 			if currentPath != "" {
 				fieldPath = currentPath + "." + fieldTag
+			} else {
+				fieldPath = fieldTag
 			}
 			if err := getFromLoader(l, fieldPath, field, 0); err != nil {
 				return err
