@@ -33,11 +33,11 @@ import (
 
 type Config struct {
   Database *database.Config `config:"db"`
-  ServerPorts []string `config:"server_port"`
+  ServerPorts []string `config:"serverPort"`
 }
 
 func main() {
-  oraleConf, err := orale.Load("my-app")
+  oraleConf, err := orale.Load("myApp")
   if err != nil {
     ...
   }
@@ -69,14 +69,14 @@ package database
 ...
 
 type Config struct {
-  Uri string `config:"connection_string"`
+  Uri string `config:"connectionString"`
   ConnectionPoolSize int
 }
 ```
 
-One thing to note is that internally Orale treats all configuration paths as
-snake case, so like the example above, when you annotate the path of your
-config value, make sure to use snake case.
+It's important to note that the keys you use in your struct tags should be
+camel case. The environment variables, toml keys, and command line flags will
+be converted to camel case to match.
 
 If we gave the following flags...:
 
