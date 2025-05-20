@@ -2,7 +2,9 @@ package orale
 
 import (
 	"fmt"
+	"math"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -65,10 +67,16 @@ func (l *Loader) MustGet(path string, target any) {
 	}
 }
 
+// GetAll populates loaded configuration values into the target value.
+// This should be a pointer type, usually a pointer to a struct. All loaded
+// configuration values will be set into the target value. Any default values
+// in the target value that are not present in the loaded configuration
+// will be left unchanged.
 func (l *Loader) GetAll(target any) error {
 	return l.Get("", target)
 }
 
+// MustGetAll is the same as GetAll except it panics if an error occurs.
 func (l *Loader) MustGetAll(target any) {
 	l.MustGet("", target)
 }
@@ -165,7 +173,7 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			return err
 		}
 		if len(value) > index {
-			strValue, ok := value[index].(string)
+			strValue, ok := intoString(value[index])
 			if ok {
 				targetRefVal.SetString(strValue)
 			}
@@ -177,7 +185,7 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			return err
 		}
 		if len(value) > index {
-			int64Value, ok := value[index].(int64)
+			int64Value, ok := intoInt64(value[index])
 			if ok {
 				targetRefVal.SetInt(int64Value)
 			}
@@ -189,7 +197,7 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			return err
 		}
 		if len(value) > index {
-			uint64Value, ok := value[index].(uint64)
+			uint64Value, ok := intoUint64(value[index])
 			if ok && len(value) > 0 {
 				targetRefVal.SetUint(uint64Value)
 			}
@@ -201,7 +209,7 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			return err
 		}
 		if len(value) > index {
-			float64Value, ok := value[index].(float64)
+			float64Value, ok := intoFloat64(value[index])
 			if ok {
 				targetRefVal.SetFloat(float64Value)
 			}
@@ -214,14 +222,7 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		}
 		if len(value) > index {
 			if len(value) > 0 {
-				val, ok := value[index].(bool)
-				if !ok {
-					var valStr string
-					valStr, ok = value[index].(string)
-					if ok {
-						val = strings.ToLower(valStr) == "true"
-					}
-				}
+				val, ok := intoBool(value[index])
 				if ok {
 					targetRefVal.SetBool(val)
 				}
@@ -326,4 +327,220 @@ func calDefaultFieldTag(fieldName string) string {
 		}
 	}
 	return fieldTag
+}
+
+func intoString(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v), true
+	case float32, float64:
+		return fmt.Sprintf("%g", v), true
+	case bool:
+		return fmt.Sprintf("%t", v), true
+	default:
+		return fmt.Sprintf("%v", v), true
+	}
+}
+
+func intoInt64(value any) (int64, bool) {
+	switch v := value.(type) {
+	case int:
+		return int64(v), true
+	case int8:
+		return int64(v), true
+	case int16:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	case int64:
+		return int64(v), true
+	case uint:
+		return int64(v), true
+	case uint8:
+		return int64(v), true
+	case uint16:
+		return int64(v), true
+	case uint32:
+		return int64(v), true
+	case float32:
+		return int64(v), true
+	case float64:
+		return int64(v), true
+	case uint64:
+		if v > math.MaxInt64 {
+			return 0, false
+		}
+		return int64(v), true
+	case string:
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return i, true
+		}
+		if u, err := strconv.ParseFloat(v, 64); err == nil {
+			if u > math.MaxInt64 {
+				return 0, false
+			}
+			return int64(u), true
+		}
+		return 0, false
+	case bool:
+		if v {
+			return 1, true
+		}
+		return 0, true
+	default:
+		return 0, false
+	}
+}
+
+func intoUint64(value any) (uint64, bool) {
+	switch v := value.(type) {
+	case uint:
+		return uint64(v), true
+	case uint8:
+		return uint64(v), true
+	case uint16:
+		return uint64(v), true
+	case uint32:
+		return uint64(v), true
+	case uint64:
+		return uint64(v), true
+	case int:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case int8:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case int16:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case int32:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case int64:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case float32:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case float64:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case string:
+		if u, err := strconv.ParseUint(v, 10, 64); err == nil {
+			return u, true
+		}
+		if i, err := strconv.ParseFloat(v, 64); err == nil {
+			if i < 0 {
+				return 0, false
+			}
+			return uint64(i), true
+		}
+		return 0, false
+	case bool:
+		if v {
+			return 1, true
+		}
+		return 0, true
+	default:
+		return 0, false
+	}
+}
+
+func intoFloat64(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int8:
+		return float64(v), true
+	case int16:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case uint:
+		return float64(v), true
+	case uint8:
+		return float64(v), true
+	case uint16:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case string:
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f, true
+		}
+		return 0, false
+	case bool:
+		if v {
+			return 1, true
+		}
+		return 0, true
+	default:
+		return 0, false
+	}
+}
+
+func intoBool(value any) (bool, bool) {
+	switch v := value.(type) {
+	case bool:
+		return v, true
+	case int:
+		return v != 0, true
+	case int8:
+		return v != 0, true
+	case int16:
+		return v != 0, true
+	case int32:
+		return v != 0, true
+	case int64:
+		return v != 0, true
+	case uint:
+		return v != 0, true
+	case uint8:
+		return v != 0, true
+	case uint16:
+		return v != 0, true
+	case uint32:
+		return v != 0, true
+	case uint64:
+		return v != 0, true
+	case float32:
+		return v != 0, true
+	case float64:
+		return v != 0, true
+	case string:
+		lower := strings.ToLower(v)
+		if lower == "true" || lower == "t" || lower == "yes" || lower == "y" || lower == "1" {
+			return true, true
+		}
+		if lower == "false" || lower == "f" || lower == "no" || lower == "n" || lower == "0" {
+			return false, true
+		}
+		return false, false
+	default:
+		return false, false
+	}
 }
