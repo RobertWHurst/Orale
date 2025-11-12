@@ -346,4 +346,183 @@ func TestLoadFromValues(t *testing.T) {
 			t.Fatalf("expected env to be value1 and value2, got %v", conf.EnvironmentValues["env"])
 		}
 	})
+
+	t.Run("should handle indexed slice access via flags", func(t *testing.T) {
+		t.Parallel()
+
+		programArgs := []string{
+			"--servers--0--host=localhost",
+			"--servers--0--port=8080",
+			"--servers--1--host=example.com",
+			"--servers--1--port=9090",
+		}
+
+		conf, err := orale.LoadFromValues(programArgs, "", []string{}, "", []string{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type Server struct {
+			Host string `config:"host"`
+			Port int    `config:"port"`
+		}
+		type Config struct {
+			Servers []Server `config:"servers"`
+		}
+
+		var config Config
+		if err := conf.Get("", &config); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(config.Servers) != 2 {
+			t.Fatalf("expected 2 servers, got %d", len(config.Servers))
+		}
+
+		if config.Servers[0].Host != "localhost" {
+			t.Fatalf("expected servers[0].host to be localhost, got %s", config.Servers[0].Host)
+		}
+		if config.Servers[0].Port != 8080 {
+			t.Fatalf("expected servers[0].port to be 8080, got %d", config.Servers[0].Port)
+		}
+
+		if config.Servers[1].Host != "example.com" {
+			t.Fatalf("expected servers[1].host to be example.com, got %s", config.Servers[1].Host)
+		}
+		if config.Servers[1].Port != 9090 {
+			t.Fatalf("expected servers[1].port to be 9090, got %d", config.Servers[1].Port)
+		}
+	})
+
+	t.Run("should handle indexed slice access via environment variables", func(t *testing.T) {
+		t.Parallel()
+
+		envVars := []string{
+			"APP__SERVERS__0__HOST=localhost",
+			"APP__SERVERS__0__PORT=8080",
+			"APP__SERVERS__1__HOST=example.com",
+			"APP__SERVERS__1__PORT=9090",
+		}
+
+		conf, err := orale.LoadFromValues([]string{}, "APP", envVars, "", []string{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type Server struct {
+			Host string `config:"host"`
+			Port int    `config:"port"`
+		}
+		type Config struct {
+			Servers []Server `config:"servers"`
+		}
+
+		var config Config
+		if err := conf.Get("", &config); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(config.Servers) != 2 {
+			t.Fatalf("expected 2 servers, got %d", len(config.Servers))
+		}
+
+		if config.Servers[0].Host != "localhost" {
+			t.Fatalf("expected servers[0].host to be localhost, got %s", config.Servers[0].Host)
+		}
+		if config.Servers[0].Port != 8080 {
+			t.Fatalf("expected servers[0].port to be 8080, got %d", config.Servers[0].Port)
+		}
+
+		if config.Servers[1].Host != "example.com" {
+			t.Fatalf("expected servers[1].host to be example.com, got %s", config.Servers[1].Host)
+		}
+		if config.Servers[1].Port != 9090 {
+			t.Fatalf("expected servers[1].port to be 9090, got %d", config.Servers[1].Port)
+		}
+	})
+
+	t.Run("should handle indexed slice of primitives via flags", func(t *testing.T) {
+		t.Parallel()
+
+		programArgs := []string{
+			"--tags--0=frontend",
+			"--tags--1=backend",
+			"--tags--2=api",
+		}
+
+		conf, err := orale.LoadFromValues(programArgs, "", []string{}, "", []string{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type Config struct {
+			Tags []string `config:"tags"`
+		}
+
+		var config Config
+		if err := conf.Get("", &config); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(config.Tags) != 3 {
+			t.Fatalf("expected 3 tags, got %d", len(config.Tags))
+		}
+
+		if config.Tags[0] != "frontend" {
+			t.Fatalf("expected tags[0] to be frontend, got %s", config.Tags[0])
+		}
+		if config.Tags[1] != "backend" {
+			t.Fatalf("expected tags[1] to be backend, got %s", config.Tags[1])
+		}
+		if config.Tags[2] != "api" {
+			t.Fatalf("expected tags[2] to be api, got %s", config.Tags[2])
+		}
+	})
+
+	t.Run("should handle sparse array indices via flags", func(t *testing.T) {
+		t.Parallel()
+
+		programArgs := []string{
+			"--servers--0--host=localhost",
+			"--servers--2--host=example.com",
+			"--servers--4--host=remote.net",
+		}
+
+		conf, err := orale.LoadFromValues(programArgs, "", []string{}, "", []string{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type Server struct {
+			Host string `config:"host"`
+		}
+		type Config struct {
+			Servers []Server `config:"servers"`
+		}
+
+		var config Config
+		if err := conf.Get("", &config); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(config.Servers) != 5 {
+			t.Fatalf("expected 5 servers (0-4), got %d", len(config.Servers))
+		}
+
+		if config.Servers[0].Host != "localhost" {
+			t.Fatalf("expected servers[0].host to be localhost, got %s", config.Servers[0].Host)
+		}
+		if config.Servers[1].Host != "" {
+			t.Fatalf("expected servers[1].host to be empty (not set), got %s", config.Servers[1].Host)
+		}
+		if config.Servers[2].Host != "example.com" {
+			t.Fatalf("expected servers[2].host to be example.com, got %s", config.Servers[2].Host)
+		}
+		if config.Servers[3].Host != "" {
+			t.Fatalf("expected servers[3].host to be empty (not set), got %s", config.Servers[3].Host)
+		}
+		if config.Servers[4].Host != "remote.net" {
+			t.Fatalf("expected servers[4].host to be remote.net, got %s", config.Servers[4].Host)
+		}
+	})
 }

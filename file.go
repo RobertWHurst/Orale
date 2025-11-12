@@ -14,7 +14,7 @@ type File struct {
 	Path string
 	// Values is a map of configuration values loaded from the file. Note that
 	// these values are flattened into paths separated by periods. Slice indexes
-	// are represented by square brackets with the index inside. The value is
+	// are represented by a period followed by the numeric index. The value is
 	// always a slice of any. It's a slice because theoretically a configuration
 	// file could have multiple values for the same path. This is not the case with
 	// toml so as of now it's always a slice of length 1.
@@ -52,7 +52,6 @@ func flattenFileValues(pathChunks []string, hierarchicalValues map[string]any, f
 		pathChunks = []string{}
 	}
 
-	// TODO: deal with slice indexes
 	for key, value := range hierarchicalValues {
 		key := toCamelCase(key)
 		keyPathChunks := append(pathChunks, key)
@@ -64,7 +63,7 @@ func flattenFileValues(pathChunks []string, hierarchicalValues map[string]any, f
 				subKeyPathChunks := []string{}
 				for j, chunk := range keyPathChunks {
 					if j == len(keyPathChunks)-1 {
-						chunk = fmt.Sprintf("%s[%d]", chunk, i)
+						chunk = fmt.Sprintf("%s.%d", chunk, i)
 					}
 					subKeyPathChunks = append(subKeyPathChunks, chunk)
 				}
@@ -75,7 +74,7 @@ func flattenFileValues(pathChunks []string, hierarchicalValues map[string]any, f
 				subKeyPathChunks := []string{}
 				for j, chunk := range keyPathChunks {
 					if j == len(keyPathChunks)-1 {
-						chunk = fmt.Sprintf("%s[%d]", chunk, i)
+						chunk = fmt.Sprintf("%s.%d", chunk, i)
 					}
 					subKeyPathChunks = append(subKeyPathChunks, chunk)
 				}

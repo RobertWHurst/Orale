@@ -163,7 +163,7 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		if valueLen > 0 {
 			targetRefVal.Set(reflect.MakeSlice(targetRefVal.Type(), valueLen, valueLen))
 			for i := 0; i < valueLen; i += 1 {
-				if err := getFromLoader(l, fmt.Sprintf("%s[%d]", currentPath, i), targetRefVal.Index(i), 0); err != nil {
+				if err := getFromLoader(l, fmt.Sprintf("%s.%d", currentPath, i), targetRefVal.Index(i), 0); err != nil {
 					return err
 				}
 			}
@@ -295,38 +295,60 @@ func resolvePathLen(l *Loader, targetPath string) (int, error) {
 		return 0, fmt.Errorf("target path cannot be empty")
 	}
 
-	flagPaths := map[string]bool{}
+	maxIndex := -1
 	for flagPath := range l.FlagValues {
 		slicePath := getSlicePathFromSubjectAndTargetPaths(flagPath, targetPath)
-		if slicePath != "" {
-			flagPaths[slicePath] = true
+		if slicePath == "" {
+			continue
+		}
+		lastDotIndex := strings.LastIndex(slicePath, ".")
+		if lastDotIndex != -1 {
+			if index, err := strconv.Atoi(slicePath[lastDotIndex+1:]); err == nil {
+				if index > maxIndex {
+					maxIndex = index
+				}
+			}
 		}
 	}
-	if len(flagPaths) != 0 {
-		return len(flagPaths), nil
+	if maxIndex >= 0 {
+		return maxIndex + 1, nil
 	}
 
-	environmentPaths := map[string]bool{}
+	maxIndex = -1
 	for environmentPath := range l.EnvironmentValues {
 		slicePath := getSlicePathFromSubjectAndTargetPaths(environmentPath, targetPath)
 		if slicePath != "" {
-			environmentPaths[slicePath] = true
+			lastDotIndex := strings.LastIndex(slicePath, ".")
+			if lastDotIndex != -1 {
+				if index, err := strconv.Atoi(slicePath[lastDotIndex+1:]); err == nil {
+					if index > maxIndex {
+						maxIndex = index
+					}
+				}
+			}
 		}
 	}
-	if len(environmentPaths) != 0 {
-		return len(environmentPaths), nil
+	if maxIndex >= 0 {
+		return maxIndex + 1, nil
 	}
 
 	for _, file := range l.ConfigurationFiles {
-		filePaths := map[string]bool{}
+		maxIndex = -1
 		for filePath := range file.Values {
 			slicePath := getSlicePathFromSubjectAndTargetPaths(filePath, targetPath)
 			if slicePath != "" {
-				filePaths[slicePath] = true
+				lastDotIndex := strings.LastIndex(slicePath, ".")
+				if lastDotIndex != -1 {
+					if index, err := strconv.Atoi(slicePath[lastDotIndex+1:]); err == nil {
+						if index > maxIndex {
+							maxIndex = index
+						}
+					}
+				}
 			}
 		}
-		if len(filePaths) != 0 {
-			return len(filePaths), nil
+		if maxIndex >= 0 {
+			return maxIndex + 1, nil
 		}
 	}
 
@@ -334,21 +356,25 @@ func resolvePathLen(l *Loader, targetPath string) (int, error) {
 }
 
 func getSlicePathFromSubjectAndTargetPaths(subjectPath, targetPath string) string {
-	if len(subjectPath) < len(targetPath)+3 || !strings.HasPrefix(subjectPath, targetPath) {
+	if len(subjectPath) < len(targetPath)+2 || !strings.HasPrefix(subjectPath, targetPath) {
 		return ""
 	}
 	remainingPath := subjectPath[len(targetPath):]
-	if remainingPath[0] != '[' {
+	if remainingPath[0] != '.' {
 		return ""
 	}
-	endIndexOffset := 0
-	for i, r := range remainingPath {
-		if r == ']' {
-			endIndexOffset = i
+	endIndexOffset := 1
+	for i := 1; i < len(remainingPath); i += 1 {
+		if remainingPath[i] >= '0' && remainingPath[i] <= '9' {
+			endIndexOffset = i + 1
+		} else {
 			break
 		}
 	}
-	return subjectPath[:len(targetPath)+endIndexOffset+1]
+	if endIndexOffset == 1 {
+		return ""
+	}
+	return subjectPath[:len(targetPath)+endIndexOffset]
 }
 
 func calDefaultFieldTag(fieldName string) string {
