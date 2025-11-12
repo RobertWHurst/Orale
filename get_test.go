@@ -2,6 +2,7 @@ package orale_test
 
 import (
 	"testing"
+	"time"
 
 	orale "github.com/RobertWHurst/orale"
 )
@@ -408,6 +409,111 @@ func TestGet(t *testing.T) {
 		}
 		if testStruct.D != "4" {
 			t.Fatalf("expected D to be 4, got %s", testStruct.D)
+		}
+	})
+
+	t.Run("should handle time.Duration conversions", func(t *testing.T) {
+		t.Parallel()
+
+		type TestDurationStruct struct {
+			StringDuration5h    time.Duration `config:"stringDuration5h"`
+			StringDuration30m   time.Duration `config:"stringDuration30m"`
+			StringDuration1h30m time.Duration `config:"stringDuration1h30m"`
+			StringDuration500ms time.Duration `config:"stringDuration500ms"`
+			IntNanoseconds      time.Duration `config:"intNanoseconds"`
+			Int64Nanoseconds    time.Duration `config:"int64Nanoseconds"`
+			Uint64Nanoseconds   time.Duration `config:"uint64Nanoseconds"`
+			FloatNanoseconds    time.Duration `config:"floatNanoseconds"`
+		}
+
+		testStruct := TestDurationStruct{}
+
+		conf := &orale.Loader{
+			EnvironmentValues: map[string][]any{
+				"stringDuration5h":    {"5h"},
+				"stringDuration30m":   {"30m"},
+				"stringDuration1h30m": {"1h30m"},
+				"stringDuration500ms": {"500ms"},
+				"intNanoseconds":      {int(1000000000)},
+				"int64Nanoseconds":    {int64(2000000000)},
+				"uint64Nanoseconds":   {uint64(3000000000)},
+				"floatNanoseconds":    {4000000000.0},
+			},
+		}
+
+		if err := conf.Get("", &testStruct); err != nil {
+			t.Fatal(err)
+		}
+
+		if testStruct.StringDuration5h != 5*time.Hour {
+			t.Fatalf("expected StringDuration5h to be 5h, got %v", testStruct.StringDuration5h)
+		}
+		if testStruct.StringDuration30m != 30*time.Minute {
+			t.Fatalf("expected StringDuration30m to be 30m, got %v", testStruct.StringDuration30m)
+		}
+		if testStruct.StringDuration1h30m != 1*time.Hour+30*time.Minute {
+			t.Fatalf("expected StringDuration1h30m to be 1h30m, got %v", testStruct.StringDuration1h30m)
+		}
+		if testStruct.StringDuration500ms != 500*time.Millisecond {
+			t.Fatalf("expected StringDuration500ms to be 500ms, got %v", testStruct.StringDuration500ms)
+		}
+		if testStruct.IntNanoseconds != time.Second {
+			t.Fatalf("expected IntNanoseconds to be 1s, got %v", testStruct.IntNanoseconds)
+		}
+		if testStruct.Int64Nanoseconds != 2*time.Second {
+			t.Fatalf("expected Int64Nanoseconds to be 2s, got %v", testStruct.Int64Nanoseconds)
+		}
+		if testStruct.Uint64Nanoseconds != 3*time.Second {
+			t.Fatalf("expected Uint64Nanoseconds to be 3s, got %v", testStruct.Uint64Nanoseconds)
+		}
+		if testStruct.FloatNanoseconds != 4*time.Second {
+			t.Fatalf("expected FloatNanoseconds to be 4s, got %v", testStruct.FloatNanoseconds)
+		}
+	})
+
+	t.Run("should handle time.Time conversions", func(t *testing.T) {
+		t.Parallel()
+
+		type TestTimeStruct struct {
+			RFC3339Time     time.Time `config:"rfc3339Time"`
+			RFC3339NanoTime time.Time `config:"rfc3339NanoTime"`
+			ISODate         time.Time `config:"isoDate"`
+			UnixTimestamp   time.Time `config:"unixTimestamp"`
+		}
+
+		testStruct := TestTimeStruct{}
+
+		conf := &orale.Loader{
+			EnvironmentValues: map[string][]any{
+				"rfc3339Time":     {"2025-01-15T10:30:00Z"},
+				"rfc3339NanoTime": {"2025-01-15T10:30:00.123456789Z"},
+				"isoDate":         {"2025-01-15"},
+				"unixTimestamp":   {int64(1736938200)},
+			},
+		}
+
+		if err := conf.Get("", &testStruct); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedRFC3339, _ := time.Parse(time.RFC3339, "2025-01-15T10:30:00Z")
+		if !testStruct.RFC3339Time.Equal(expectedRFC3339) {
+			t.Fatalf("expected RFC3339Time to be %v, got %v", expectedRFC3339, testStruct.RFC3339Time)
+		}
+
+		expectedRFC3339Nano, _ := time.Parse(time.RFC3339Nano, "2025-01-15T10:30:00.123456789Z")
+		if !testStruct.RFC3339NanoTime.Equal(expectedRFC3339Nano) {
+			t.Fatalf("expected RFC3339NanoTime to be %v, got %v", expectedRFC3339Nano, testStruct.RFC3339NanoTime)
+		}
+
+		expectedISO, _ := time.Parse("2006-01-02", "2025-01-15")
+		if !testStruct.ISODate.Equal(expectedISO) {
+			t.Fatalf("expected ISODate to be %v, got %v", expectedISO, testStruct.ISODate)
+		}
+
+		expectedUnix := time.Unix(1736938200, 0)
+		if !testStruct.UnixTimestamp.Equal(expectedUnix) {
+			t.Fatalf("expected UnixTimestamp to be %v, got %v", expectedUnix, testStruct.UnixTimestamp)
 		}
 	})
 }

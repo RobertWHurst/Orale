@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -90,10 +91,25 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		return getFromLoader(l, currentPath, targetRefVal.Elem(), 0)
 
 	case reflect.Struct:
-		typ := targetRefVal.Type()
+		targetRefType := targetRefVal.Type()
+
+		if targetRefType == reflect.TypeOf(time.Time{}) {
+			value, err := resolveValue(l, currentPath)
+			if err != nil {
+				return err
+			}
+			if len(value) > index {
+				timeValue, ok := intoTime(value[index])
+				if ok {
+					targetRefVal.Set(reflect.ValueOf(timeValue))
+				}
+			}
+			return nil
+		}
+
 		for i := 0; i < targetRefVal.NumField(); i++ {
 			field := targetRefVal.Field(i)
-			structField := typ.Field(i)
+			structField := targetRefType.Field(i)
 
 			// Check if the field is exported
 			if !field.CanSet() {
@@ -135,6 +151,7 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 				return err
 			}
 		}
+
 	case reflect.Slice:
 		if targetRefVal.IsNil() {
 			targetRefVal.Set(reflect.MakeSlice(targetRefVal.Type(), 0, 0))
@@ -180,6 +197,22 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		targetRefType := targetRefVal.Type()
+
+		if targetRefType == reflect.TypeOf(time.Duration(0)) {
+			value, err := resolveValue(l, currentPath)
+			if err != nil {
+				return err
+			}
+			if len(value) > index {
+				duration, ok := intoDuration(value[index])
+				if ok {
+					targetRefVal.Set(reflect.ValueOf(duration))
+				}
+			}
+			return nil
+		}
+
 		value, err := resolveValue(l, currentPath)
 		if err != nil {
 			return err
@@ -239,18 +272,22 @@ func resolveValue(l *Loader, targetPath string) ([]any, error) {
 	if targetPath == "" {
 		return nil, fmt.Errorf("target path cannot be empty")
 	}
-	if value, ok := l.FlagValues[targetPath]; ok {
-		return value, nil
-	} else if value, ok := l.EnvironmentValues[targetPath]; ok {
-		return value, nil
+
+	var value []any
+	if v, ok := l.FlagValues[targetPath]; ok {
+		value = v
+	} else if v, ok := l.EnvironmentValues[targetPath]; ok {
+		value = v
 	} else {
 		for _, file := range l.ConfigurationFiles {
-			if value, ok := file.Values[targetPath]; ok {
-				return value, nil
+			if v, ok := file.Values[targetPath]; ok {
+				value = v
+				break
 			}
 		}
 	}
-	return nil, nil
+
+	return value, nil
 }
 
 func resolvePathLen(l *Loader, targetPath string) (int, error) {
@@ -542,5 +579,91 @@ func intoBool(value any) (bool, bool) {
 		return false, false
 	default:
 		return false, false
+	}
+}
+
+func intoTime(value any) (time.Time, bool) {
+	switch v := value.(type) {
+	case string:
+		// Try common time formats (most specific first)
+		formats := []string{
+			time.RFC3339Nano,      // Most specific ISO 8601 with nanoseconds
+			time.RFC3339,          // ISO 8601 without nanoseconds
+			time.RFC1123Z,         // RFC1123 with numeric timezone
+			time.RFC1123,          // RFC1123 with text timezone
+			time.RFC822Z,          // RFC822 with numeric timezone
+			time.RFC822,           // RFC822 with text timezone
+			time.RFC850,           // Longer date format
+			time.RubyDate,         // Ruby's time format
+			time.UnixDate,         // Unix date format
+			time.ANSIC,            // ANSI C format
+			"2006-01-02 15:04:05", // Date-time without timezone (more specific)
+			"2006-01-02",          // Date only (less specific)
+		}
+		for _, format := range formats {
+			if t, err := time.Parse(format, v); err == nil {
+				return t, true
+			}
+		}
+		return time.Time{}, false
+	case int, int64:
+		// Treat as Unix timestamp (seconds)
+		var sec int64
+		switch val := v.(type) {
+		case int:
+			sec = int64(val)
+		case int64:
+			sec = val
+		}
+		return time.Unix(sec, 0), true
+	case float64:
+		// Treat as Unix timestamp with fractional seconds
+		sec := int64(v)
+		nsec := int64((v - float64(sec)) * 1e9)
+		return time.Unix(sec, nsec), true
+	default:
+		return time.Time{}, false
+	}
+}
+
+func intoDuration(value any) (time.Duration, bool) {
+	switch v := value.(type) {
+	case string:
+		if d, err := time.ParseDuration(v); err == nil {
+			return d, true
+		}
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return time.Duration(i), true
+		}
+		return 0, false
+	case int:
+		return time.Duration(v), true
+	case int8:
+		return time.Duration(v), true
+	case int16:
+		return time.Duration(v), true
+	case int32:
+		return time.Duration(v), true
+	case int64:
+		return time.Duration(v), true
+	case uint:
+		return time.Duration(v), true
+	case uint8:
+		return time.Duration(v), true
+	case uint16:
+		return time.Duration(v), true
+	case uint32:
+		return time.Duration(v), true
+	case uint64:
+		if v > math.MaxInt64 {
+			return 0, false
+		}
+		return time.Duration(v), true
+	case float32:
+		return time.Duration(v), true
+	case float64:
+		return time.Duration(v), true
+	default:
+		return 0, false
 	}
 }
