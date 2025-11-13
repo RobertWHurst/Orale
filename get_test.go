@@ -8,136 +8,133 @@ import (
 )
 
 func newTestLoaderSingleValues() *orale.Loader {
-	return &orale.Loader{
-		FlagValues: map[string][]any{
-			"a": {"1"},
-			"b": {"2"},
-			"c": {"3"},
-			"d": {"4"},
-		},
-		EnvironmentValues: map[string][]any{
-			"b": {"5"},
-			"e": {"6"},
-		},
-		ConfigurationFiles: []*orale.File{
-			{
-				Path: "path/to/other/file-2.toml",
-				Values: map[string][]any{
-					"d": {"9"},
-					"g": {"10"},
-				},
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"a": {"1"},
+		"b": {"2"},
+		"c": {"3"},
+		"d": {"4"},
+	}
+	l.EnvironmentValues = map[string][]any{
+		"b": {"5"},
+		"e": {"6"},
+	}
+	l.ConfigurationFiles = []*orale.File{
+		{
+			Path: "path/to/other/file-2.toml",
+			Values: map[string][]any{
+				"d": {"9"},
+				"g": {"10"},
 			},
-			{
-				Path: "path/to/file-1.toml",
-				Values: map[string][]any{
-					"c": {"7"},
-					"f": {"8"},
-					"g": {"9"},
-					"h": {"10"},
-				},
+		},
+		{
+			Path: "path/to/file-1.toml",
+			Values: map[string][]any{
+				"c": {"7"},
+				"f": {"8"},
+				"g": {"9"},
+				"h": {"10"},
 			},
 		},
 	}
+	return l
 }
 
 func newTestLoaderMultiValues() *orale.Loader {
-	return &orale.Loader{
-		FlagValues: map[string][]any{
-			"a": {"1", "2"},
-			"b": {"3", "4"},
-			"c": {"5", "6"},
-			"d": {"7", "8"},
-		},
-		EnvironmentValues: map[string][]any{
-			"b": {"9", "10"},
-			"e": {"11", "12"},
-		},
-		ConfigurationFiles: []*orale.File{},
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"a": {"1", "2"},
+		"b": {"3", "4"},
+		"c": {"5", "6"},
+		"d": {"7", "8"},
 	}
+	l.EnvironmentValues = map[string][]any{
+		"b": {"9", "10"},
+		"e": {"11", "12"},
+	}
+	l.ConfigurationFiles = []*orale.File{}
+	return l
 }
 
 func TestGet(t *testing.T) {
-	t.Parallel()
-	
 	t.Run("should handle type conversions from environment variables", func(t *testing.T) {
 		t.Parallel()
 
 		type TestConversionStruct struct {
 			// Int conversions
-			StringToInt    int  `config:"stringToInt"`
-			FloatToInt     int  `config:"floatToInt"`
-			BoolTrueToInt  int  `config:"boolTrueToInt"`
-			BoolFalseToInt int  `config:"boolFalseToInt"`
-			
+			StringToInt    int `config:"stringToInt"`
+			FloatToInt     int `config:"floatToInt"`
+			BoolTrueToInt  int `config:"boolTrueToInt"`
+			BoolFalseToInt int `config:"boolFalseToInt"`
+
 			// Uint conversions
-			StringToUint    uint  `config:"stringToUint"`
-			FloatToUint     uint  `config:"floatToUint"`
-			BoolTrueToUint  uint  `config:"boolTrueToUint"`
-			BoolFalseToUint uint  `config:"boolFalseToUint"`
-			
+			StringToUint    uint `config:"stringToUint"`
+			FloatToUint     uint `config:"floatToUint"`
+			BoolTrueToUint  uint `config:"boolTrueToUint"`
+			BoolFalseToUint uint `config:"boolFalseToUint"`
+
 			// Float conversions
-			StringToFloat    float64  `config:"stringToFloat"`
-			IntToFloat       float64  `config:"intToFloat"`
-			BoolTrueToFloat  float64  `config:"boolTrueToFloat"`
-			BoolFalseToFloat float64  `config:"boolFalseToFloat"`
-			
+			StringToFloat    float64 `config:"stringToFloat"`
+			IntToFloat       float64 `config:"intToFloat"`
+			BoolTrueToFloat  float64 `config:"boolTrueToFloat"`
+			BoolFalseToFloat float64 `config:"boolFalseToFloat"`
+
 			// Bool conversions
-			StringTrueToBool   bool  `config:"stringTrueToBool"`
-			StringYesToBool    bool  `config:"stringYesToBool"`
-			StringOneToBool    bool  `config:"stringOneToBool"`
-			StringFalseToBool  bool  `config:"stringFalseToBool"`
-			StringNoToBool     bool  `config:"stringNoToBool"`
-			StringZeroToBool   bool  `config:"stringZeroToBool"`
-			IntOneToBool       bool  `config:"intOneToBool"`
-			IntZeroToBool      bool  `config:"intZeroToBool"`
-			
+			StringTrueToBool  bool `config:"stringTrueToBool"`
+			StringYesToBool   bool `config:"stringYesToBool"`
+			StringOneToBool   bool `config:"stringOneToBool"`
+			StringFalseToBool bool `config:"stringFalseToBool"`
+			StringNoToBool    bool `config:"stringNoToBool"`
+			StringZeroToBool  bool `config:"stringZeroToBool"`
+			IntOneToBool      bool `config:"intOneToBool"`
+			IntZeroToBool     bool `config:"intZeroToBool"`
+
 			// String conversions
-			IntToString      string  `config:"intToString"`
-			FloatToString    string  `config:"floatToString"`
-			BoolTrueToString string  `config:"boolTrueToString"`
-			BoolFalseToString string  `config:"boolFalseToString"`
+			IntToString       string `config:"intToString"`
+			FloatToString     string `config:"floatToString"`
+			BoolTrueToString  string `config:"boolTrueToString"`
+			BoolFalseToString string `config:"boolFalseToString"`
 		}
 
 		testStruct := TestConversionStruct{}
 
-		conf := &orale.Loader{
-			EnvironmentValues: map[string][]any{
-				// Int conversions
-				"stringToInt":    {"42"},
-				"floatToInt":     {42.7},
-				"boolTrueToInt":  {true},
-				"boolFalseToInt": {false},
-				
-				// Uint conversions
-				"stringToUint":    {"84"},
-				"floatToUint":     {84.7},
-				"boolTrueToUint":  {true},
-				"boolFalseToUint": {false},
-				
-				// Float conversions
-				"stringToFloat":    {"3.14"},
-				"intToFloat":       {42},
-				"boolTrueToFloat":  {true},
-				"boolFalseToFloat": {false},
-				
-				// Bool conversions
-				"stringTrueToBool":  {"true"},
-				"stringYesToBool":   {"yes"},
-				"stringOneToBool":   {"1"},
-				"stringFalseToBool": {"false"},
-				"stringNoToBool":    {"no"},
-				"stringZeroToBool":  {"0"},
-				"intOneToBool":      {1},
-				"intZeroToBool":     {0},
-				
-				// String conversions
-				"intToString":       {42},
-				"floatToString":     {3.14},
-				"boolTrueToString":  {true},
-				"boolFalseToString": {false},
-			},
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.EnvironmentValues = map[string][]any{
+			// Int conversions
+			"stringToInt":    {"42"},
+			"floatToInt":     {42.7},
+			"boolTrueToInt":  {true},
+			"boolFalseToInt": {false},
+
+			// Uint conversions
+			"stringToUint":    {"84"},
+			"floatToUint":     {84.7},
+			"boolTrueToUint":  {true},
+			"boolFalseToUint": {false},
+
+			// Float conversions
+			"stringToFloat":    {"3.14"},
+			"intToFloat":       {42},
+			"boolTrueToFloat":  {true},
+			"boolFalseToFloat": {false},
+
+			// Bool conversions
+			"stringTrueToBool":  {"true"},
+			"stringYesToBool":   {"yes"},
+			"stringOneToBool":   {"1"},
+			"stringFalseToBool": {"false"},
+			"stringNoToBool":    {"no"},
+			"stringZeroToBool":  {"0"},
+			"intOneToBool":      {1},
+			"intZeroToBool":     {0},
+
+			// String conversions
+			"intToString":       {42},
+			"floatToString":     {3.14},
+			"boolTrueToString":  {true},
+			"boolFalseToString": {false},
 		}
-		
+
 		if err := conf.Get("", &testStruct); err != nil {
 			t.Fatal(err)
 		}
@@ -155,7 +152,7 @@ func TestGet(t *testing.T) {
 		if testStruct.BoolFalseToInt != 0 {
 			t.Fatalf("expected BoolFalseToInt to be 0, got %d", testStruct.BoolFalseToInt)
 		}
-		
+
 		// Uint conversions
 		if testStruct.StringToUint != 84 {
 			t.Fatalf("expected StringToUint to be 84, got %d", testStruct.StringToUint)
@@ -169,7 +166,7 @@ func TestGet(t *testing.T) {
 		if testStruct.BoolFalseToUint != 0 {
 			t.Fatalf("expected BoolFalseToUint to be 0, got %d", testStruct.BoolFalseToUint)
 		}
-		
+
 		// Float conversions
 		if testStruct.StringToFloat != 3.14 {
 			t.Fatalf("expected StringToFloat to be 3.14, got %f", testStruct.StringToFloat)
@@ -183,7 +180,7 @@ func TestGet(t *testing.T) {
 		if testStruct.BoolFalseToFloat != 0.0 {
 			t.Fatalf("expected BoolFalseToFloat to be 0.0, got %f", testStruct.BoolFalseToFloat)
 		}
-		
+
 		// Bool conversions
 		if testStruct.StringTrueToBool != true {
 			t.Fatalf("expected StringTrueToBool to be true, got %v", testStruct.StringTrueToBool)
@@ -209,7 +206,7 @@ func TestGet(t *testing.T) {
 		if testStruct.IntZeroToBool != false {
 			t.Fatalf("expected IntZeroToBool to be false, got %v", testStruct.IntZeroToBool)
 		}
-		
+
 		// String conversions
 		if testStruct.IntToString != "42" {
 			t.Fatalf("expected IntToString to be '42', got %s", testStruct.IntToString)
@@ -354,12 +351,11 @@ func TestGet(t *testing.T) {
 			D: "5",
 		}
 
-		conf := &orale.Loader{
-			FlagValues: map[string][]any{
-				"a": {"1"},
-				"b": {"2"},
-				"d": {"4"},
-			},
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.FlagValues = map[string][]any{
+			"a": {"1"},
+			"b": {"2"},
+			"d": {"4"},
 		}
 		if err := conf.Get("", &testStruct); err != nil {
 			t.Fatal(err)
@@ -428,17 +424,16 @@ func TestGet(t *testing.T) {
 
 		testStruct := TestDurationStruct{}
 
-		conf := &orale.Loader{
-			EnvironmentValues: map[string][]any{
-				"stringDuration5h":    {"5h"},
-				"stringDuration30m":   {"30m"},
-				"stringDuration1h30m": {"1h30m"},
-				"stringDuration500ms": {"500ms"},
-				"intNanoseconds":      {int(1000000000)},
-				"int64Nanoseconds":    {int64(2000000000)},
-				"uint64Nanoseconds":   {uint64(3000000000)},
-				"floatNanoseconds":    {4000000000.0},
-			},
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.EnvironmentValues = map[string][]any{
+			"stringDuration5h":    {"5h"},
+			"stringDuration30m":   {"30m"},
+			"stringDuration1h30m": {"1h30m"},
+			"stringDuration500ms": {"500ms"},
+			"intNanoseconds":      {int(1000000000)},
+			"int64Nanoseconds":    {int64(2000000000)},
+			"uint64Nanoseconds":   {uint64(3000000000)},
+			"floatNanoseconds":    {4000000000.0},
 		}
 
 		if err := conf.Get("", &testStruct); err != nil {
@@ -483,13 +478,12 @@ func TestGet(t *testing.T) {
 
 		testStruct := TestTimeStruct{}
 
-		conf := &orale.Loader{
-			EnvironmentValues: map[string][]any{
-				"rfc3339Time":     {"2025-01-15T10:30:00Z"},
-				"rfc3339NanoTime": {"2025-01-15T10:30:00.123456789Z"},
-				"isoDate":         {"2025-01-15"},
-				"unixTimestamp":   {int64(1736938200)},
-			},
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.EnvironmentValues = map[string][]any{
+			"rfc3339Time":     {"2025-01-15T10:30:00Z"},
+			"rfc3339NanoTime": {"2025-01-15T10:30:00.123456789Z"},
+			"isoDate":         {"2025-01-15"},
+			"unixTimestamp":   {int64(1736938200)},
 		}
 
 		if err := conf.Get("", &testStruct); err != nil {

@@ -10,4 +10,8 @@ type Loader struct {
 	EnvironmentValues map[string][]any
 	// ConfigurationFiles is a slice of configuration files.
 	ConfigurationFiles []*File
+	// expandTargets is used to detect circular variable expansion.
+	expandTargets map[string]struct{}
+	// expandCache caches expanded values for performance.
+	expandCache map[string]string
 }

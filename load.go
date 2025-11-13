@@ -111,6 +111,8 @@ func LoadFromValues(programArgs []string, envVarPrefix string, envVars []string,
 		FlagValues:         flagValues,
 		EnvironmentValues:  environmentValues,
 		ConfigurationFiles: configurationFiles,
+		expandTargets:      map[string]struct{}{},
+		expandCache:        map[string]string{},
 	}, nil
 }
 
