@@ -14,8 +14,7 @@ const configEnvironmentKey = "configEnvironment"
 // configuration files. Flags are taken from `os.Args[1:]`. Environment
 // variables are taken from `os.Environ()`. Configuration files are taken from
 // the working directory and all parent directories. The configuration file
-// name is the application name with the extension `.config.toml`. If the name
-// contain
+// name is the application name with the extension `.config.toml`.
 func Load(applicationName string) (*Loader, error) {
 	var workingDir string
 	if testWorkingDir != "" {
@@ -123,13 +122,17 @@ func loadFlags(programArgs []string) map[string][]any {
 
 	previousFlag := ""
 	for _, arg := range programArgs {
+		if len(arg) == 0 {
+			continue
+		}
+
 		if previousFlag != "" {
 			arg = previousFlag + "=" + arg
 			previousFlag = ""
 		}
 
-		isShortFlag := arg[0] == '-' && arg[1] != '-'
-		isFlag := !isShortFlag && arg[0:2] == "--"
+		isShortFlag := len(arg) >= 2 && arg[0] == '-' && arg[1] != '-'
+		isFlag := !isShortFlag && len(arg) >= 2 && arg[0:2] == "--"
 
 		var startIndex int
 		switch {
@@ -209,13 +212,17 @@ func loadEnvironment(variablePrefix string, envVariables []string) map[string][]
 
 func extractEnvironmentName(flagValues map[string][]any, environmentValues map[string][]any) string {
 	for key, values := range flagValues {
-		if key == configEnvironmentKey {
-			return values[0].(string)
+		if key == configEnvironmentKey && len(values) > 0 {
+			if str, ok := values[0].(string); ok {
+				return str
+			}
 		}
 	}
 	for key, values := range environmentValues {
-		if key == configEnvironmentKey {
-			return values[0].(string)
+		if key == configEnvironmentKey && len(values) > 0 {
+			if str, ok := values[0].(string); ok {
+				return str
+			}
 		}
 	}
 	return ""
