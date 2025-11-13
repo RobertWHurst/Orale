@@ -78,6 +78,130 @@ func TestExpand(t *testing.T) {
 		}
 	})
 
+	t.Run("should expand config variables with snake_case paths", func(t *testing.T) {
+		t.Parallel()
+
+		type TestStruct struct {
+			FooBar string `config:"fooBar"`
+			AckBaz string `config:"ackBaz"`
+		}
+
+		testStruct := TestStruct{}
+
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.EnvironmentValues = map[string][]any{
+			"fooBar": {"abc"},
+			"ackBaz": {"%{foo_bar}def"},
+		}
+
+		if err := conf.Get("", &testStruct); err != nil {
+			t.Fatal(err)
+		}
+
+		if testStruct.FooBar != "abc" {
+			t.Fatalf("expected FooBar to be 'abc', got %s", testStruct.FooBar)
+		}
+		if testStruct.AckBaz != "abcdef" {
+			t.Fatalf("expected AckBaz to be 'abcdef', got %s", testStruct.AckBaz)
+		}
+	})
+
+	t.Run("should expand config variables with kebab-case paths", func(t *testing.T) {
+		t.Parallel()
+
+		type TestStruct struct {
+			FooBar string `config:"fooBar"`
+			AckBaz string `config:"ackBaz"`
+		}
+
+		testStruct := TestStruct{}
+
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.EnvironmentValues = map[string][]any{
+			"fooBar": {"xyz"},
+			"ackBaz": {"%{foo-bar}123"},
+		}
+
+		if err := conf.Get("", &testStruct); err != nil {
+			t.Fatal(err)
+		}
+
+		if testStruct.FooBar != "xyz" {
+			t.Fatalf("expected FooBar to be 'xyz', got %s", testStruct.FooBar)
+		}
+		if testStruct.AckBaz != "xyz123" {
+			t.Fatalf("expected AckBaz to be 'xyz123', got %s", testStruct.AckBaz)
+		}
+	})
+
+	t.Run("should expand nested config variables with double-underscore notation", func(t *testing.T) {
+		t.Parallel()
+
+		type DatabaseConfig struct {
+			Host string `config:"host"`
+			Port int    `config:"port"`
+		}
+
+		type TestStruct struct {
+			Database      DatabaseConfig `config:"database"`
+			ConnectionURL string         `config:"connectionUrl"`
+		}
+
+		testStruct := TestStruct{}
+
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.EnvironmentValues = map[string][]any{
+			"database.host":  {"db.example.com"},
+			"database.port":  {5432},
+			"connectionUrl": {"postgres://%{database__host}:%{database__port}/mydb"},
+		}
+
+		if err := conf.Get("", &testStruct); err != nil {
+			t.Fatal(err)
+		}
+
+		if testStruct.Database.Host != "db.example.com" {
+			t.Fatalf("expected Database.Host to be 'db.example.com', got %s", testStruct.Database.Host)
+		}
+		if testStruct.ConnectionURL != "postgres://db.example.com:5432/mydb" {
+			t.Fatalf("expected ConnectionURL to be 'postgres://db.example.com:5432/mydb', got %s", testStruct.ConnectionURL)
+		}
+	})
+
+	t.Run("should expand nested config variables with double-dash notation", func(t *testing.T) {
+		t.Parallel()
+
+		type DatabaseConfig struct {
+			Host string `config:"host"`
+			Port int    `config:"port"`
+		}
+
+		type TestStruct struct {
+			Database      DatabaseConfig `config:"database"`
+			ConnectionURL string         `config:"connectionUrl"`
+		}
+
+		testStruct := TestStruct{}
+
+		conf, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+		conf.EnvironmentValues = map[string][]any{
+			"database.host":  {"db.example.com"},
+			"database.port":  {5432},
+			"connectionUrl": {"postgres://%{database--host}:%{database--port}/mydb"},
+		}
+
+		if err := conf.Get("", &testStruct); err != nil {
+			t.Fatal(err)
+		}
+
+		if testStruct.Database.Host != "db.example.com" {
+			t.Fatalf("expected Database.Host to be 'db.example.com', got %s", testStruct.Database.Host)
+		}
+		if testStruct.ConnectionURL != "postgres://db.example.com:5432/mydb" {
+			t.Fatalf("expected ConnectionURL to be 'postgres://db.example.com:5432/mydb', got %s", testStruct.ConnectionURL)
+		}
+	})
+
 	t.Run("should expand file variables", func(t *testing.T) {
 		t.Parallel()
 

@@ -75,6 +75,9 @@ func expandValue(l *Loader, rawValue any) (any, error) {
 			}
 
 			p := string(in[s+2 : e])
+			p = strings.Replace(p, "__", ".", -1)
+			p = strings.Replace(p, "--", ".", -1)
+			p = toCamelCase(p)
 			vs, err := resolveValue(l, p)
 			if err != nil {
 				return nil, expandError(value, s, e, fmt.Errorf("configuration variable could not be resolved: %w", err))
@@ -83,8 +86,8 @@ func expandValue(l *Loader, rawValue any) (any, error) {
 			v := ""
 			if len(vs) >= 1 {
 				va := vs[0]
-				if vs, ok := va.(string); ok {
-					v = vs
+				if str, ok := intoString(va); ok {
+					v = str
 				}
 			}
 

@@ -20,6 +20,7 @@ _A fantastic little config loader for Go that collects configuration from flags,
 - 🪆 **Nested configuration** - Support for nested structs and embedded fields
 - 📋 **Slice support** - Multi-value configuration (multiple flags, array values)
 - 🎨 **Flexible naming** - Automatically converts between camelCase, snake_case, and kebab-case
+- 🔀 **Variable expansion** - Reference environment variables, other config values, or file contents
 - ⚙️ **Environment-specific configs** - Load different configs for dev, staging, production
 - 🔧 **Default values** - Keep defaults in your structs, override only what you need
 
@@ -142,6 +143,246 @@ Orale automatically converts between different naming conventions and path delim
      Port int `config:"serverPort"`  // Correct - matches converted paths
      Port int `config:"server_port"` // Wrong - won't match
      ```
+
+## Variable Expansion
+
+Orale supports variable expansion in configuration values, allowing you to reference environment variables, other configuration values, or file contents. This is useful for building dynamic configuration values, referencing secrets, and avoiding duplication.
+
+### Variable Types
+
+Orale supports three types of variable expansion:
+
+| Syntax | Type | Description | Example |
+|--------|------|-------------|---------|
+| `${VAR}` | Environment Variable | Expands to the value of the environment variable `VAR` | `${HOME}`, `${DATABASE_PASSWORD}` |
+| `%{key}` | Config Variable | Expands to the value of another config key | `%{baseUrl}`, `%{database.host}` |
+| `@{path}` | File Variable | Expands to the contents of the file at `path` (strips trailing newline) | `@{/secrets/api-key}`, `@{./cert.pem}` |
+
+**Key features:**
+- Variables can be combined in a single value
+- Expansion happens recursively (config variables can contain other variables)
+- Config variables support any naming convention (snake_case, kebab-case, camelCase)
+- Config variables can reference any value type (strings, integers, floats, bools)
+- File contents have trailing newlines automatically stripped
+- Circular references are detected and return an error
+
+### Environment Variables: `${VAR}`
+
+Reference environment variables using `${VAR}` syntax:
+
+```go
+type Config struct {
+    DatabaseURL string `config:"databaseUrl"`
+    APIKey      string `config:"apiKey"`
+}
+```
+
+**Configuration file** (`myApp.config.toml`):
+```toml
+database_url = "postgres://${DB_HOST}:${DB_PORT}/mydb"
+api_key = "${API_SECRET}"
+```
+
+**Run with environment variables:**
+```sh
+DB_HOST=localhost DB_PORT=5432 API_SECRET=secret123 ./myApp
+```
+
+**Result:**
+- `config.DatabaseURL` = `"postgres://localhost:5432/mydb"`
+- `config.APIKey` = `"secret123"`
+
+**You can also use environment variables directly:**
+```sh
+# Environment variables (higher precedence than config files)
+MY_APP__DATABASE_URL='postgres://${DB_HOST}:${DB_PORT}/mydb' \
+MY_APP__API_KEY='${API_SECRET}' \
+DB_HOST=localhost \
+DB_PORT=5432 \
+API_SECRET=secret123 \
+./myApp
+```
+
+### Config Variables: `%{key}`
+
+Reference other configuration values using `%{key}` syntax. This is useful for building related URLs or avoiding duplication. Config variable paths support any naming convention - use whatever matches your configuration source (snake_case for TOML, kebab-case for flags, or direct camelCase):
+
+```go
+type Config struct {
+    BaseURL    string `config:"baseUrl"`
+    APIURL     string `config:"apiUrl"`
+    WebhookURL string `config:"webhookUrl"`
+}
+```
+
+**Configuration file** (`myApp.config.toml`):
+```toml
+base_url = "https://api.example.com"
+api_url = "%{base_url}/v1"
+webhook_url = "%{base_url}/webhooks/incoming"
+```
+
+**Result:**
+- `config.BaseURL` = `"https://api.example.com"`
+- `config.APIURL` = `"https://api.example.com/v1"`
+- `config.WebhookURL` = `"https://api.example.com/webhooks/incoming"`
+
+**Nested paths:** Use dots, double-underscores, or double-dashes to reference nested values:
+```toml
+[database]
+host = "db.example.com"
+port = 5432
+
+[database]
+# All of these work the same:
+connection_string = "postgres://%{database.host}:%{database.port}/mydb"
+# Or with double-underscore (TOML/env style):
+connection_string = "postgres://%{database__host}:%{database__port}/mydb"
+# Or with double-dash (flag style):
+connection_string = "postgres://%{database--host}:%{database--port}/mydb"
+```
+
+**Note:** Config variables automatically convert non-string values (integers, floats, bools) to strings, so you can reference any configuration value.
+
+### File Variables: `@{path}`
+
+Read file contents using `@{path}` syntax. This is ideal for reading secrets, certificates, or API keys from files:
+
+```go
+type Config struct {
+    APIKey      string `config:"apiKey"`
+    Certificate string `config:"certificate"`
+}
+```
+
+**Configuration file** (`myApp.config.toml`):
+```toml
+api_key = "@{/run/secrets/api-key}"
+certificate = "@{/etc/ssl/certs/app-cert.pem}"
+```
+
+**With files:**
+```sh
+# /run/secrets/api-key
+sk_live_abc123def456
+
+# /etc/ssl/certs/app-cert.pem
+-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKZ...
+-----END CERTIFICATE-----
+```
+
+**Result:**
+- `config.APIKey` = `"sk_live_abc123def456"`
+- `config.Certificate` = Full certificate content (trailing newline removed)
+
+**Security note:** File variables are perfect for Docker secrets, Kubernetes mounted secrets, or any secrets management system that writes secrets to files.
+
+### Combining Variable Types
+
+You can combine all three variable types in a single value:
+
+```go
+type Config struct {
+    ConnectionString string `config:"connectionString"`
+}
+```
+
+**Configuration file** (`myApp.config.toml`):
+```toml
+[database]
+host = "dbserver.example.com"
+
+connection_string = "host=%{database.host};password=${DB_PASSWORD};cert=@{/secrets/db-cert.pem}"
+```
+
+**Run with:**
+```sh
+DB_PASSWORD=securepass123 ./myApp
+```
+
+**Result:**
+```
+config.ConnectionString = "host=dbserver.example.com;password=securepass123;cert=-----BEGIN CERTIFICATE-----..."
+```
+
+### Practical Examples
+
+#### Docker Secrets Pattern
+
+```toml
+# myApp.config.toml
+[database]
+host = "postgres"
+port = 5432
+name = "myapp"
+user = "myapp"
+password = "@{/run/secrets/db_password}"
+
+[database]
+url = "postgres://%{database.user}:%{database.password}@%{database.host}:%{database.port}/%{database.name}"
+```
+
+```sh
+# docker-compose.yml
+services:
+  app:
+    image: myapp:latest
+    secrets:
+      - db_password
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+```
+
+#### Multi-Environment Configuration
+
+```toml
+# myApp.production.config.toml
+environment = "production"
+base_url = "https://${DOMAIN}"
+api_url = "%{baseUrl}/api"
+cdn_url = "%{baseUrl}/cdn"
+
+[security]
+tls_cert = "@{/etc/letsencrypt/live/${DOMAIN}/fullchain.pem}"
+tls_key = "@{/etc/letsencrypt/live/${DOMAIN}/privkey.pem}"
+```
+
+#### Development with Local Overrides
+
+```toml
+# myApp.config.toml (checked into git)
+[database]
+host = "localhost"
+port = 5432
+
+[api]
+base_url = "%{protocol}://%{database.host}:${API_PORT}"
+protocol = "http"
+```
+
+```sh
+# .env file (not checked into git)
+API_PORT=8080
+```
+
+### Error Handling
+
+Orale will return an error for:
+- **Circular references**: `a = "%{b}"` and `b = "%{a}"`
+- **Missing closing brace**: `"${UNCLOSED"`
+- **Non-existent files**: `"@{/path/that/does/not/exist}"`
+- **Invalid UTF-8 in files**: File contents must be valid UTF-8
+
+Example:
+```go
+loader, _ := orale.Load("myApp")
+if err := loader.GetAll(&config); err != nil {
+    // Handle expansion errors
+    fmt.Printf("Configuration error: %v\n", err)
+}
+```
 
 ## Type Conversions
 
