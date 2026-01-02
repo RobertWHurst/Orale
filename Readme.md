@@ -21,13 +21,20 @@ _A fantastic little config loader for Go that collects configuration from flags,
 - 📋 **Slice support** - Multi-value configuration (multiple flags, array values)
 - 🎨 **Flexible naming** - Automatically converts between camelCase, snake_case, and kebab-case
 - 🔀 **Variable expansion** - Reference environment variables, other config values, or file contents
+- 🔐 **Local dev encryption** - Commit encrypted secrets safely for team development
 - ⚙️ **Environment-specific configs** - Load different configs for dev, staging, production
 - 🔧 **Default values** - Keep defaults in your structs, override only what you need
 
 ## Installation
 
+**Library:**
 ```sh
 go get github.com/RobertWHurst/orale
+```
+
+**CLI (for encryption):**
+```sh
+go install github.com/RobertWHurst/orale/cmd/orale@latest
 ```
 
 ## Quick Start
@@ -383,6 +390,131 @@ if err := loader.GetAll(&config); err != nil {
     fmt.Printf("Configuration error: %v\n", err)
 }
 ```
+
+## Local Development Encryption
+
+Orale supports encrypting configuration values that need to be committed to your repository. This is perfect for **local development defaults** that your team shares, like database passwords for local Docker containers or test API keys.
+
+**Use this for:**
+- Local development database passwords
+- Test API keys and credentials
+- Shared development secrets that all team members use
+
+**Do NOT use this for:**
+- Production secrets (use environment variables or proper secret management)
+- User-specific values (use environment variables)
+- Secrets that differ per environment (use environment variables)
+
+### Team Setup Workflow
+
+**One-time team setup:**
+
+1. One team member generates a key:
+   ```sh
+   orale keygen dev
+   ```
+
+2. Share the output key securely with the team (Slack DM, password manager, etc.)
+
+3. Team members import the key:
+   ```sh
+   orale keyset Xkn4noje9zkpnSLImQHlkRUfBnlyOfo13hKlIN5vgp2J4k+b3RztePvvHJRGjhtbKn...
+   ```
+
+**Encrypting values:**
+
+```sh
+# Encrypt a value
+orale encrypt dev "my-local-db-password"
+# Output: ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]
+
+# From stdin
+echo "my-secret" | orale encrypt dev
+```
+
+**Using encrypted values:**
+
+Encrypted values work in all configuration sources:
+
+```toml
+# Config file (myApp.config.toml) - safe to commit!
+[database]
+password = "ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer+BC8tYXxYJnyrCJUAKoxkjHTNj2rEd5pcwgd/1QlS37JuES3xMxWsVvWPJAchp40=]"
+```
+
+```sh
+# Environment variables
+MY_APP__DATABASE__PASSWORD='ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]'
+
+# Flags
+./myApp --database--password='ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]'
+```
+
+**Automatic decryption in your app:**
+
+```go
+type Config struct {
+    Database struct {
+        Host     string `config:"host"`
+        Port     int    `config:"port"`
+        Password string `config:"password"`
+    } `config:"database"`
+}
+
+func main() {
+    loader, _ := orale.Load("myApp")
+
+    config := Config{
+        Database: {
+            Port: 5432,  // Default port
+        },
+    }
+
+    loader.GetAll(&config)
+
+    // config.Database.Password is automatically decrypted!
+    fmt.Println(config.Database.Password) // "my-local-db-password"
+}
+```
+
+### How It Works
+
+1. Encrypted values use the format `ENC[base64-data]`
+2. During config loading, Orale detects and decrypts these values automatically
+3. Tries all available keys in `~/.config/orale/` until HMAC verification succeeds
+4. Decryption happens **before** variable expansion
+5. Your application receives the plain text value
+
+### Multiple Keys
+
+You can have different keys for different purposes:
+
+```sh
+orale keygen dev        # For local development
+orale keygen staging    # For staging environment defaults
+orale keygen testing    # For test fixtures
+
+orale keylist           # List all available keys
+```
+
+Orale automatically tries all keys when decrypting - each value works with whichever key encrypted it.
+
+### CLI Reference
+
+**View loaded configuration:**
+```sh
+orale explain myApp
+orale explain myApp --port=3000  # Include flags to see final values
+```
+
+Displays a table showing all loaded config values, their current values, and sources (flag/environment/file path).
+
+### Security Notes
+
+- Keys stored in `~/.config/orale/<name>.ok` with 0600 permissions
+- AES-256-CBC encryption with HMAC-SHA256 authentication
+- Each encrypted value has a unique random IV
+- **Production secrets should use environment variables**, not committed encrypted values
 
 ## Type Conversions
 

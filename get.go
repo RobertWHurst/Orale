@@ -302,7 +302,17 @@ func resolveValue(l *Loader, targetPath string) ([]any, error) {
 
 	var err error
 	for i, v := range value {
-		value[i], err = expandValue(l, v)
+		if strValue, ok := v.(string); ok && isEncrypted(strValue) {
+			value[i], err = decryptValue(strValue)
+			if err != nil {
+				if sourcePath != "" {
+					return nil, fmt.Errorf("cannot decrypt value from '%s(%s)': %w", source, sourcePath, err)
+				}
+				return nil, fmt.Errorf("cannot decrypt value from '%s': %w", source, err)
+			}
+		}
+
+		value[i], err = expandValue(l, value[i])
 		if err != nil {
 			if sourcePath != "" {
 				return nil, fmt.Errorf("cannot expand value from '%s(%s)': %w", source, sourcePath, err)
