@@ -8,7 +8,7 @@ import (
 	orale "github.com/RobertWHurst/orale"
 )
 
-func TestExpand(t *testing.T) {
+func Test_Expand(t *testing.T) {
 	t.Run("should expand environment variables", func(t *testing.T) {
 		type TestStruct struct {
 			DatabaseURL string `config:"databaseUrl"`

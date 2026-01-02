@@ -101,9 +101,10 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			}
 			if len(value) > index {
 				timeValue, ok := intoTime(value[index])
-				if ok {
-					targetRefVal.Set(reflect.ValueOf(timeValue))
+				if !ok {
+					return fmt.Errorf("failed to convert value to time.Time at path '%s': got %v", currentPath, value[index])
 				}
+				targetRefVal.Set(reflect.ValueOf(timeValue))
 			}
 			return nil
 		}
@@ -192,9 +193,10 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		}
 		if len(value) > index {
 			strValue, ok := intoString(value[index])
-			if ok {
-				targetRefVal.SetString(strValue)
+			if !ok {
+				return fmt.Errorf("failed to convert value to string at path '%s': got %T", currentPath, value[index])
 			}
+			targetRefVal.SetString(strValue)
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -207,9 +209,10 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			}
 			if len(value) > index {
 				duration, ok := intoDuration(value[index])
-				if ok {
-					targetRefVal.Set(reflect.ValueOf(duration))
+				if !ok {
+					return fmt.Errorf("failed to convert value to time.Duration at path '%s': got %v", currentPath, value[index])
 				}
+				targetRefVal.Set(reflect.ValueOf(duration))
 			}
 			return nil
 		}
@@ -220,9 +223,10 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		}
 		if len(value) > index {
 			int64Value, ok := intoInt64(value[index])
-			if ok {
-				targetRefVal.SetInt(int64Value)
+			if !ok {
+				return fmt.Errorf("failed to convert value to %s at path '%s': got %v", targetRefType.Kind(), currentPath, value[index])
 			}
+			targetRefVal.SetInt(int64Value)
 		}
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -232,9 +236,10 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		}
 		if len(value) > index {
 			uint64Value, ok := intoUint64(value[index])
-			if ok && len(value) > 0 {
-				targetRefVal.SetUint(uint64Value)
+			if !ok {
+				return fmt.Errorf("failed to convert value to %s at path '%s': got %v", targetRefVal.Kind(), currentPath, value[index])
 			}
+			targetRefVal.SetUint(uint64Value)
 		}
 
 	case reflect.Float32, reflect.Float64:
@@ -244,9 +249,10 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		}
 		if len(value) > index {
 			float64Value, ok := intoFloat64(value[index])
-			if ok {
-				targetRefVal.SetFloat(float64Value)
+			if !ok {
+				return fmt.Errorf("failed to convert value to %s at path '%s': got %v", targetRefVal.Kind(), currentPath, value[index])
 			}
+			targetRefVal.SetFloat(float64Value)
 		}
 
 	case reflect.Bool:
@@ -255,15 +261,44 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			return err
 		}
 		if len(value) > index {
-			if len(value) > 0 {
-				val, ok := intoBool(value[index])
-				if ok {
-					targetRefVal.SetBool(val)
-				}
+			val, ok := intoBool(value[index])
+			if !ok {
+				return fmt.Errorf("failed to convert value to bool at path '%s': got %v", currentPath, value[index])
 			}
+			targetRefVal.SetBool(val)
+		}
+
+	case reflect.Map:
+		if targetRefVal.IsNil() {
+			targetRefVal.Set(reflect.MakeMap(targetRefVal.Type()))
+		}
+
+		mapKeys := findMapKeys(l, currentPath)
+		if len(mapKeys) == 0 {
+			return nil
+		}
+
+		elemType := targetRefVal.Type().Elem()
+		for _, mapKey := range mapKeys {
+			keyPath := currentPath
+			if currentPath != "" {
+				keyPath = currentPath + "." + mapKey
+			} else {
+				keyPath = mapKey
+			}
+
+			elemVal := reflect.New(elemType).Elem()
+			if err := getFromLoader(l, keyPath, elemVal, 0); err != nil {
+				return err
+			}
+
+			targetRefVal.SetMapIndex(reflect.ValueOf(mapKey), elemVal)
 		}
 
 	default:
+		if currentPath != "" {
+			return fmt.Errorf("unsupported type %s at path '%s'", targetRefVal.Kind(), currentPath)
+		}
 		return fmt.Errorf("unsupported type %s", targetRefVal.Kind())
 	}
 	return nil
@@ -409,6 +444,63 @@ func getSlicePathFromSubjectAndTargetPaths(subjectPath, targetPath string) strin
 		return ""
 	}
 	return subjectPath[:len(targetPath)+endIndexOffset]
+}
+
+func findMapKeys(l *Loader, targetPath string) []string {
+	keySet := make(map[string]bool)
+	prefix := targetPath + "."
+	if targetPath == "" {
+		prefix = ""
+	}
+
+	for path := range l.FlagValues {
+		if key := extractMapKey(path, prefix); key != "" {
+			keySet[key] = true
+		}
+	}
+
+	for path := range l.EnvironmentValues {
+		if key := extractMapKey(path, prefix); key != "" {
+			keySet[key] = true
+		}
+	}
+
+	for _, file := range l.ConfigurationFiles {
+		for path := range file.Values {
+			if key := extractMapKey(path, prefix); key != "" {
+				keySet[key] = true
+			}
+		}
+	}
+
+	keys := make([]string, 0, len(keySet))
+	for key := range keySet {
+		keys = append(keys, key)
+	}
+
+	return keys
+}
+
+func extractMapKey(path, prefix string) string {
+	if prefix == "" {
+		dotIndex := strings.Index(path, ".")
+		if dotIndex == -1 {
+			return path
+		}
+		return path[:dotIndex]
+	}
+
+	if !strings.HasPrefix(path, prefix) {
+		return ""
+	}
+
+	remainder := path[len(prefix):]
+	dotIndex := strings.Index(remainder, ".")
+	if dotIndex == -1 {
+		return remainder
+	}
+
+	return remainder[:dotIndex]
 }
 
 func calDefaultFieldTag(fieldName string) string {

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestIntoInt64(t *testing.T) {
+func Test_IntoInt64(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -62,7 +62,7 @@ func TestIntoInt64(t *testing.T) {
 	}
 }
 
-func TestIntoUint64(t *testing.T) {
+func Test_IntoUint64(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -127,7 +127,7 @@ func TestIntoUint64(t *testing.T) {
 	}
 }
 
-func TestIntoFloat64(t *testing.T) {
+func Test_IntoFloat64(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -180,7 +180,7 @@ func TestIntoFloat64(t *testing.T) {
 	}
 }
 
-func TestIntoBool(t *testing.T) {
+func Test_IntoBool(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -245,7 +245,7 @@ func TestIntoBool(t *testing.T) {
 	}
 }
 
-func TestIntoTime(t *testing.T) {
+func Test_IntoTime(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -281,7 +281,7 @@ func TestIntoTime(t *testing.T) {
 	}
 }
 
-func TestIntoDuration(t *testing.T) {
+func Test_IntoDuration(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -331,7 +331,7 @@ func TestIntoDuration(t *testing.T) {
 	}
 }
 
-func TestIntoString(t *testing.T) {
+func Test_IntoString(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

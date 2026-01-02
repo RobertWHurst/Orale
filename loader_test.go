@@ -15,7 +15,7 @@ func init() {
 	testAssetsPath = filepath.Join(filepath.Dir(currentFilePath), "test-assets")
 }
 
-func TestLoadAndGetConfig(t *testing.T) {
+func Test_LoadAndGetConfig(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should load flags, environment variables, and configuration files, then correctly assign them to a struct", func(t *testing.T) {

@@ -639,6 +639,40 @@ port = 9090
 
 **Note:** Indices can be sparse (e.g., `servers.0`, `servers.4`). Orale will create a slice with the appropriate length, and unset indices will have zero values.
 
+### Maps
+
+Maps allow dynamic keys for configuration:
+
+```go
+type Config struct {
+    Labels   map[string]string `config:"labels"`
+    Ports    map[string]int    `config:"ports"`
+    Features map[string]bool   `config:"features"`
+}
+```
+
+**Flags:**
+```sh
+./app --labels--env=development --labels--version=1.0.0 --labels--team=backend
+```
+
+**Environment variables:**
+```sh
+APP__LABELS__ENV=development
+APP__LABELS__VERSION=1.0.0
+APP__LABELS__TEAM=backend
+```
+
+**TOML:**
+```toml
+[labels]
+env = "development"
+version = "1.0.0"
+team = "backend"
+```
+
+Maps support any value type (string, int, bool, float, structs, etc.). Keys are extracted from the configuration paths automatically.
+
 ### Nested Structs
 
 Nested structs create configuration paths using their `config` tag:

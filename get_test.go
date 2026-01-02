@@ -1,6 +1,7 @@
 package orale_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -56,7 +57,7 @@ func newTestLoaderMultiValues() *orale.Loader {
 	return l
 }
 
-func TestGet(t *testing.T) {
+func Test_Get(t *testing.T) {
 	t.Run("should handle type conversions from environment variables", func(t *testing.T) {
 		t.Parallel()
 
@@ -510,4 +511,515 @@ func TestGet(t *testing.T) {
 			t.Fatalf("expected UnixTimestamp to be %v, got %v", expectedUnix, testStruct.UnixTimestamp)
 		}
 	})
+}
+func Test_Get_mapStringString(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"labels.env":     {"development"},
+		"labels.version": {"1.0.0"},
+		"labels.team":    {"backend"},
+	}
+
+	type Config struct {
+		Labels map[string]string `config:"labels"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if len(config.Labels) != 3 {
+		t.Errorf("map length = %d, want 3", len(config.Labels))
+	}
+
+	if config.Labels["env"] != "development" {
+		t.Errorf("Labels[env] = %q, want %q", config.Labels["env"], "development")
+	}
+
+	if config.Labels["version"] != "1.0.0" {
+		t.Errorf("Labels[version] = %q, want %q", config.Labels["version"], "1.0.0")
+	}
+
+	if config.Labels["team"] != "backend" {
+		t.Errorf("Labels[team] = %q, want %q", config.Labels["team"], "backend")
+	}
+}
+
+func Test_Get_mapStringInt(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.ConfigurationFiles = []*orale.File{
+		{
+			Path: "config.toml",
+			Values: map[string][]any{
+				"ports.http":  {8080},
+				"ports.https": {8443},
+				"ports.admin": {9000},
+			},
+		},
+	}
+
+	type Config struct {
+		Ports map[string]int `config:"ports"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if len(config.Ports) != 3 {
+		t.Errorf("map length = %d, want 3", len(config.Ports))
+	}
+
+	if config.Ports["http"] != 8080 {
+		t.Errorf("Ports[http] = %d, want 8080", config.Ports["http"])
+	}
+
+	if config.Ports["https"] != 8443 {
+		t.Errorf("Ports[https] = %d, want 8443", config.Ports["https"])
+	}
+
+	if config.Ports["admin"] != 9000 {
+		t.Errorf("Ports[admin] = %d, want 9000", config.Ports["admin"])
+	}
+}
+
+func Test_Get_nestedMapInStruct(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.EnvironmentValues = map[string][]any{
+		"database.settings.maxConnections": {"100"},
+		"database.settings.timeout":        {"30s"},
+		"database.host":                    {"localhost"},
+	}
+
+	type Config struct {
+		Database struct {
+			Host     string            `config:"host"`
+			Settings map[string]string `config:"settings"`
+		} `config:"database"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if config.Database.Host != "localhost" {
+		t.Errorf("Database.Host = %q, want localhost", config.Database.Host)
+	}
+
+	if len(config.Database.Settings) != 2 {
+		t.Errorf("Database.Settings length = %d, want 2", len(config.Database.Settings))
+	}
+
+	if config.Database.Settings["maxConnections"] != "100" {
+		t.Errorf("Settings[maxConnections] = %q, want 100", config.Database.Settings["maxConnections"])
+	}
+
+	if config.Database.Settings["timeout"] != "30s" {
+		t.Errorf("Settings[timeout] = %q, want 30s", config.Database.Settings["timeout"])
+	}
+}
+
+func Test_Get_emptyMap(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+
+	type Config struct {
+		Labels map[string]string `config:"labels"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if config.Labels == nil {
+		t.Error("Labels should be initialized, not nil")
+	}
+
+	if len(config.Labels) != 0 {
+		t.Errorf("Labels length = %d, want 0", len(config.Labels))
+	}
+}
+
+func Test_Get_mapFromMultipleSources(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"env.nodeEnv": {"production"},
+	}
+	l.EnvironmentValues = map[string][]any{
+		"env.debug": {"false"},
+	}
+	l.ConfigurationFiles = []*orale.File{
+		{
+			Path: "config.toml",
+			Values: map[string][]any{
+				"env.region": {"us-west-2"},
+			},
+		},
+	}
+
+	type Config struct {
+		Env map[string]string `config:"env"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if len(config.Env) != 3 {
+		t.Errorf("Env length = %d, want 3", len(config.Env))
+	}
+
+	if config.Env["nodeEnv"] != "production" {
+		t.Errorf("Env[nodeEnv] = %q, want production", config.Env["nodeEnv"])
+	}
+
+	if config.Env["debug"] != "false" {
+		t.Errorf("Env[debug] = %q, want false", config.Env["debug"])
+	}
+
+	if config.Env["region"] != "us-west-2" {
+		t.Errorf("Env[region] = %q, want us-west-2", config.Env["region"])
+	}
+}
+
+func Test_Get_mapStringBool(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"features.darkMode":   {"true"},
+		"features.analytics":  {"false"},
+		"features.betaAccess": {"1"},
+	}
+
+	type Config struct {
+		Features map[string]bool `config:"features"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if config.Features["darkMode"] != true {
+		t.Errorf("Features[darkMode] = %v, want true", config.Features["darkMode"])
+	}
+
+	if config.Features["analytics"] != false {
+		t.Errorf("Features[analytics] = %v, want false", config.Features["analytics"])
+	}
+
+	if config.Features["betaAccess"] != true {
+		t.Errorf("Features[betaAccess] = %v, want true", config.Features["betaAccess"])
+	}
+}
+
+func Test_Get_mapPrecedence(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"config.key1": {"from-flag"},
+	}
+	l.EnvironmentValues = map[string][]any{
+		"config.key1": {"from-env"},
+		"config.key2": {"from-env"},
+	}
+	l.ConfigurationFiles = []*orale.File{
+		{
+			Path: "config.toml",
+			Values: map[string][]any{
+				"config.key1": {"from-file"},
+				"config.key2": {"from-file"},
+				"config.key3": {"from-file"},
+			},
+		},
+	}
+
+	type Config struct {
+		Config map[string]string `config:"config"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if config.Config["key1"] != "from-flag" {
+		t.Errorf("Config[key1] = %q, want from-flag (flags have highest precedence)", config.Config["key1"])
+	}
+
+	if config.Config["key2"] != "from-env" {
+		t.Errorf("Config[key2] = %q, want from-env (environment has second precedence)", config.Config["key2"])
+	}
+
+	if config.Config["key3"] != "from-file" {
+		t.Errorf("Config[key3] = %q, want from-file", config.Config["key3"])
+	}
+}
+func Test_Get_errorMessageIncludesPath_int(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"server.port": {"not-a-number"},
+	}
+
+	type Config struct {
+		Server struct {
+			Port int `config:"port"`
+		} `config:"server"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+
+	if err == nil {
+		t.Fatal("GetAll() should return error for invalid int conversion")
+	}
+
+	if !strings.Contains(err.Error(), "server.port") {
+		t.Errorf("error message should include path 'server.port': %v", err)
+	}
+}
+
+func Test_Get_errorMessageIncludesPath_bool(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.EnvironmentValues = map[string][]any{
+		"app.debug": {"not-a-bool"},
+	}
+
+	type Config struct {
+		App struct {
+			Debug bool `config:"debug"`
+		} `config:"app"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+
+	if err == nil {
+		t.Fatal("GetAll() should return error for invalid bool conversion")
+	}
+
+	if !strings.Contains(err.Error(), "app.debug") {
+		t.Errorf("error message should include path 'app.debug': %v", err)
+	}
+}
+
+func Test_Get_errorMessageIncludesPath_float(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.ConfigurationFiles = []*orale.File{
+		{
+			Path: "config.toml",
+			Values: map[string][]any{
+				"metrics.ratio": {"invalid-float"},
+			},
+		},
+	}
+
+	type Config struct {
+		Metrics struct {
+			Ratio float64 `config:"ratio"`
+		} `config:"metrics"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+
+	if err == nil {
+		t.Fatal("GetAll() should return error for invalid float conversion")
+	}
+
+	if !strings.Contains(err.Error(), "metrics.ratio") {
+		t.Errorf("error message should include path 'metrics.ratio': %v", err)
+	}
+}
+
+func Test_Get_errorMessageIncludesPath_duration(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"server.timeout": {"not-a-duration"},
+	}
+
+	type Config struct {
+		Server struct {
+			Timeout int64 `config:"timeout"`
+		} `config:"server"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+
+	if err == nil {
+		t.Fatal("GetAll() should return error for invalid duration conversion")
+	}
+
+	if !strings.Contains(err.Error(), "server.timeout") {
+		t.Errorf("error message should include path 'server.timeout': %v", err)
+	}
+}
+
+func Test_Get_errorMessageIncludesPath_unsupportedType(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"data.values": {"test"},
+	}
+
+	type Config struct {
+		Data struct {
+			Values chan string `config:"values"`
+		} `config:"data"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+
+	if err == nil {
+		t.Fatal("GetAll() should return error for unsupported type")
+	}
+
+	if !strings.Contains(err.Error(), "data.values") {
+		t.Errorf("error message should include path 'data.values': %v", err)
+	}
+
+	if !strings.Contains(err.Error(), "chan") {
+		t.Errorf("error message should mention the unsupported type 'chan': %v", err)
+	}
+}
+
+func Test_Get_errorMessageForNestedPath(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.ConfigurationFiles = []*orale.File{
+		{
+			Path: "config.toml",
+			Values: map[string][]any{
+				"api.endpoints.primary.timeout": {"invalid"},
+			},
+		},
+	}
+
+	type Config struct {
+		Api struct {
+			Endpoints struct {
+				Primary struct {
+					Timeout int `config:"timeout"`
+				} `config:"primary"`
+			} `config:"endpoints"`
+		} `config:"api"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+
+	if err == nil {
+		t.Fatal("GetAll() should return error for invalid conversion")
+	}
+
+	if !strings.Contains(err.Error(), "api.endpoints.primary.timeout") {
+		t.Errorf("error message should include full path 'api.endpoints.primary.timeout': %v", err)
+	}
+}
+func Test_Get_missingValuesDoNotError(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"port": {"8080"},
+	}
+
+	type Config struct {
+		Port    int    `config:"port"`
+		Host    string `config:"host"`
+		Debug   bool   `config:"debug"`
+		Timeout int64  `config:"timeout"`
+		Ratio   float64 `config:"ratio"`
+	}
+
+	config := Config{
+		Host:    "default-host",
+		Debug:   true,
+		Timeout: 30,
+		Ratio:   1.5,
+	}
+
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() should not error for missing values, got: %v", err)
+	}
+
+	if config.Port != 8080 {
+		t.Errorf("Port = %d, want 8080", config.Port)
+	}
+
+	if config.Host != "default-host" {
+		t.Errorf("Host = %q, want default-host (should preserve default)", config.Host)
+	}
+
+	if config.Debug != true {
+		t.Errorf("Debug = %v, want true (should preserve default)", config.Debug)
+	}
+
+	if config.Timeout != 30 {
+		t.Errorf("Timeout = %d, want 30 (should preserve default)", config.Timeout)
+	}
+
+	if config.Ratio != 1.5 {
+		t.Errorf("Ratio = %f, want 1.5 (should preserve default)", config.Ratio)
+	}
+}
+
+func Test_Get_missingMapKeysDoNotError(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+
+	type Config struct {
+		Labels map[string]string `config:"labels"`
+	}
+
+	var config Config
+
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() should not error for missing map, got: %v", err)
+	}
+
+	if config.Labels == nil {
+		t.Error("Labels should be initialized to empty map, not nil")
+	}
+
+	if len(config.Labels) != 0 {
+		t.Errorf("Labels should be empty, got %d entries", len(config.Labels))
+	}
+}
+
+func Test_Get_partialMapDoesNotError(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"config.key1": {"value1"},
+	}
+
+	type Config struct {
+		Config map[string]string `config:"config"`
+		Other  string            `config:"other"`
+	}
+
+	config := Config{
+		Other: "default-value",
+	}
+
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() should not error for partially missing values, got: %v", err)
+	}
+
+	if config.Config["key1"] != "value1" {
+		t.Errorf("Config[key1] = %q, want value1", config.Config["key1"])
+	}
+
+	if config.Other != "default-value" {
+		t.Errorf("Other = %q, want default-value (should preserve default)", config.Other)
+	}
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/RobertWHurst/orale"
 )
 
-func TestLoad(t *testing.T) {
+func Test_Load(t *testing.T) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -196,7 +196,7 @@ func TestLoad(t *testing.T) {
 	})
 }
 
-func TestLoadFromValues(t *testing.T) {
+func Test_LoadFromValues(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should load flag and short flag values", func(t *testing.T) {
