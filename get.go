@@ -197,6 +197,16 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 				return fmt.Errorf("failed to convert value to string at path '%s': got %T", currentPath, value[index])
 			}
 			targetRefVal.SetString(strValue)
+		} else if len(value) == 0 {
+			// No external value found, decrypt default value if it's encrypted
+			currentValue := targetRefVal.String()
+			if currentValue != "" {
+				decrypted, err := ensureDecrypted(currentValue)
+				if err != nil {
+					return fmt.Errorf("cannot decrypt default value at path '%s': %w", currentPath, err)
+				}
+				targetRefVal.SetString(decrypted)
+			}
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:

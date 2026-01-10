@@ -172,3 +172,13 @@ func pkcs7Unpad(data []byte) ([]byte, error) {
 
 	return data[:len(data)-padding], nil
 }
+
+// ensureDecrypted checks if a string value is encrypted and decrypts it if needed.
+// If the value is not encrypted, it returns the value unchanged.
+// This ensures all string values from any source are properly decrypted.
+func ensureDecrypted(value string) (string, error) {
+	if !isEncrypted(value) {
+		return value, nil
+	}
+	return decryptValue(value)
+}

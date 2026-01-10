@@ -1,6 +1,9 @@
 package orale_test
 
 import (
+	"crypto/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -1021,5 +1024,68 @@ func Test_Get_partialMapDoesNotError(t *testing.T) {
 
 	if config.Other != "default-value" {
 		t.Errorf("Other = %q, want default-value (should preserve default)", config.Other)
+	}
+}
+
+func Test_Get_encryptedDefaultValue(t *testing.T) {
+	tempDir := t.TempDir()
+	home := os.Getenv("HOME")
+	defer os.Setenv("HOME", home)
+	os.Setenv("HOME", tempDir)
+
+	configDir := filepath.Join(tempDir, ".config", "orale")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	salt := make([]byte, 32)
+	encryptionKey := make([]byte, 32)
+	hmacKey := make([]byte, 32)
+
+	if _, err := rand.Read(salt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rand.Read(encryptionKey); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rand.Read(hmacKey); err != nil {
+		t.Fatal(err)
+	}
+
+	keyData := make([]byte, 0, 96+len("test-key"))
+	keyData = append(keyData, salt...)
+	keyData = append(keyData, encryptionKey...)
+	keyData = append(keyData, hmacKey...)
+	keyData = append(keyData, []byte("test-key")...)
+
+	keyPath := filepath.Join(configDir, "test-key.ok")
+	if err := os.WriteFile(keyPath, keyData, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	plaintext := "secret-password"
+	encrypted, err := orale.Encrypt([]byte(plaintext), encryptionKey, hmacKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encryptedValue := "ENC[" + encrypted + "]"
+
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+
+	type Config struct {
+		Password string `config:"password"`
+	}
+
+	config := Config{
+		Password: encryptedValue,
+	}
+
+	err = l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if config.Password != plaintext {
+		t.Errorf("Password = %q, want %q (encrypted default should be decrypted)", config.Password, plaintext)
 	}
 }

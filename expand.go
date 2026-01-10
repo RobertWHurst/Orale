@@ -56,7 +56,13 @@ func expandValue(l *Loader, rawValue any) (any, error) {
 			k := string(in[s+2 : e])
 			v := os.Getenv(k)
 
-			out = append(out, []rune(v)...)
+			// Decrypt environment variable value if it's encrypted
+			decrypted, err := ensureDecrypted(v)
+			if err != nil {
+				return nil, expandError(value, s, e, fmt.Errorf("cannot decrypt environment variable: %w", err))
+			}
+
+			out = append(out, []rune(decrypted)...)
 			isExpanded = true
 
 		// %{...} - Config Variable
@@ -124,7 +130,13 @@ func expandValue(l *Loader, rawValue any) (any, error) {
 			}
 			v := strings.TrimSuffix(string(fv), "\n")
 
-			out = append(out, []rune(v)...)
+			// Decrypt file content if it's encrypted
+			decrypted, err := ensureDecrypted(v)
+			if err != nil {
+				return nil, expandError(value, s, e, fmt.Errorf("cannot decrypt file content: %w", err))
+			}
+
+			out = append(out, []rune(decrypted)...)
 			isExpanded = true
 
 		// Non-Variable Characters

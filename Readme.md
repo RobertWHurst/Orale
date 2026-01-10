@@ -485,6 +485,67 @@ func main() {
 4. Decryption happens **before** variable expansion
 5. Your application receives the plain text value
 
+### Where Encrypted Values Are Decrypted
+
+Orale automatically detects and decrypts `ENC[...]` values **everywhere** string values can appear:
+
+**1. Configuration Files (TOML)**
+```toml
+database_password = "ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]"
+```
+
+**2. Command-Line Flags**
+```sh
+./myApp --api-key='ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]'
+```
+
+**3. Environment Variables**
+```sh
+MY_APP__SECRET='ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]'
+```
+
+**4. Default Struct Values**
+```go
+type Config struct {
+    // Default value is encrypted - will be decrypted automatically!
+    APIKey string `config:"apiKey"`
+}
+
+config := Config{
+    APIKey: "ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]",
+}
+loader.GetAll(&config)
+// config.APIKey is now decrypted
+```
+
+**5. Environment Variable Expansions**
+```sh
+# Set an encrypted value in an environment variable
+export SECRET_TOKEN='ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]'
+```
+
+```toml
+# Reference it in your config - both the expansion AND the result are decrypted
+api_token = "${SECRET_TOKEN}"  # Decrypted automatically
+```
+
+**6. File Variable Expansions**
+```sh
+# Store encrypted value in a file
+echo 'ENC[q7Q6pVJdK6dHDH/s204CDWTmGqtNQvMA8X78V7uImer...]' > /secrets/api-key
+```
+
+```toml
+# Read from file - content is decrypted automatically
+api_key = "@{/secrets/api-key}"  # Decrypted automatically
+```
+
+**Key Points:**
+- Decryption is **completely automatic** - you never need to call decrypt functions
+- Works with **all configuration sources** (files, flags, environment, defaults)
+- Decryption happens **before** variable expansion, so expanded variables can also be encrypted
+- If a value isn't encrypted (doesn't match `ENC[...]`), it's used as-is
+
 ### Multiple Keys
 
 You can have different keys for different purposes:
