@@ -59,7 +59,10 @@ func expandValue(l *Loader, rawValue any) (any, error) {
 			// Decrypt environment variable value if it's encrypted
 			decrypted, err := ensureDecrypted(v)
 			if err != nil {
-				return nil, expandError(value, s, e, fmt.Errorf("cannot decrypt environment variable: %w", err))
+				if !l.DisableDecryptionWarnings {
+					fmt.Fprintf(os.Stderr, "warning: cannot decrypt environment variable '%s': %v (using empty value)\n", k, err)
+				}
+				decrypted = ""
 			}
 
 			out = append(out, []rune(decrypted)...)
@@ -133,7 +136,10 @@ func expandValue(l *Loader, rawValue any) (any, error) {
 			// Decrypt file content if it's encrypted
 			decrypted, err := ensureDecrypted(v)
 			if err != nil {
-				return nil, expandError(value, s, e, fmt.Errorf("cannot decrypt file content: %w", err))
+				if !l.DisableDecryptionWarnings {
+					fmt.Fprintf(os.Stderr, "warning: cannot decrypt file content from '%s': %v (using empty value)\n", rp, err)
+				}
+				decrypted = ""
 			}
 
 			out = append(out, []rune(decrypted)...)

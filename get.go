@@ -203,9 +203,13 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 			if currentValue != "" {
 				decrypted, err := ensureDecrypted(currentValue)
 				if err != nil {
-					return fmt.Errorf("cannot decrypt default value at path '%s': %w", currentPath, err)
+					if !l.DisableDecryptionWarnings {
+						fmt.Fprintf(os.Stderr, "warning: cannot decrypt default value at path '%s': %v (using empty value)\n", currentPath, err)
+					}
+					targetRefVal.SetString("")
+				} else {
+					targetRefVal.SetString(decrypted)
 				}
-				targetRefVal.SetString(decrypted)
 			}
 		}
 
@@ -350,10 +354,15 @@ func resolveValue(l *Loader, targetPath string) ([]any, error) {
 		if strValue, ok := v.(string); ok && isEncrypted(strValue) {
 			value[i], err = decryptValue(strValue)
 			if err != nil {
-				if sourcePath != "" {
-					return nil, fmt.Errorf("cannot decrypt value from '%s(%s)': %w", source, sourcePath, err)
+				if !l.DisableDecryptionWarnings {
+					if sourcePath != "" {
+						fmt.Fprintf(os.Stderr, "warning: cannot decrypt value from '%s(%s)': %v (using empty value)\n", source, sourcePath, err)
+					} else {
+						fmt.Fprintf(os.Stderr, "warning: cannot decrypt value from '%s': %v (using empty value)\n", source, err)
+					}
 				}
-				return nil, fmt.Errorf("cannot decrypt value from '%s': %w", source, err)
+				value[i] = ""
+				err = nil
 			}
 		}
 

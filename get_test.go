@@ -1089,3 +1089,32 @@ func Test_Get_encryptedDefaultValue(t *testing.T) {
 		t.Errorf("Password = %q, want %q (encrypted default should be decrypted)", config.Password, plaintext)
 	}
 }
+
+func Test_Get_encryptedDefaultValue_fallbackToEmptyWhenDecryptionFails(t *testing.T) {
+	tempDir := t.TempDir()
+	home := os.Getenv("HOME")
+	defer os.Setenv("HOME", home)
+	os.Setenv("HOME", tempDir)
+
+	// Don't create any key files - decryption will fail
+
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.DisableDecryptionWarnings = true
+
+	type Config struct {
+		Password string `config:"password"`
+	}
+
+	config := Config{
+		Password: "ENC[someinvalidencryptedvalue]",
+	}
+
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() should not error when decryption fails, got: %v", err)
+	}
+
+	if config.Password != "" {
+		t.Errorf("Password = %q, want empty string when decryption fails", config.Password)
+	}
+}

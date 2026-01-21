@@ -14,4 +14,8 @@ type Loader struct {
 	expandTargets map[string]struct{}
 	// expandCache caches expanded values for performance.
 	expandCache map[string]string
+	// DisableDecryptionWarnings suppresses warnings when encrypted values cannot
+	// be decrypted. When decryption fails, the value will be replaced with an
+	// empty string regardless of this setting.
+	DisableDecryptionWarnings bool
 }
