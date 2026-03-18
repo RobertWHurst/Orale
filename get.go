@@ -181,8 +181,6 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 						return err
 					}
 				}
-			} else {
-				targetRefVal.Set(reflect.MakeSlice(targetRefVal.Type(), 0, 0))
 			}
 		}
 
