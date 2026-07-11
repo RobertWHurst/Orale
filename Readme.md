@@ -568,7 +568,7 @@ orale explain myApp
 orale explain myApp --port=3000  # Include flags to see final values
 ```
 
-Displays a table showing all loaded config values, their current values, and sources (flag/environment/file path).
+Displays a table showing all loaded config values, their current values, and sources (flag/environment/file path). Fields tagged with `secret:"true"` are masked as `******` after the loader has walked your config struct with `Get` or `GetAll`.
 
 ### Security Notes
 
@@ -1161,6 +1161,34 @@ Loads all configuration into the target struct.
 ```go
 var config Config
 loader.GetAll(&config)
+```
+
+Fields can be marked secret for explain output by adding a `secret:"true"` tag alongside the `config` tag:
+```go
+type Config struct {
+    APIKey string `config:"apiKey" secret:"true"`
+}
+```
+
+### `(*Loader).Explain() []ExplainEntry`
+
+Returns loaded configuration values with their path, display value, source, and secret status. Values follow Orale's normal precedence order (flags > environment > configuration files), and each path appears once.
+
+Secret values are returned with `Value` set to `******` and `Secret` set to `true`.
+
+**Example:**
+```go
+loader, err := orale.Load("myApp")
+if err != nil {
+    panic(err)
+}
+
+var config Config
+if err := loader.GetAll(&config); err != nil {
+    panic(err)
+}
+
+entries := loader.Explain()
 ```
 
 ### `(*Loader).MustGet(path string, target interface{})`

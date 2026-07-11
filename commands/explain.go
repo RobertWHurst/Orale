@@ -3,8 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 	"unicode"
 
@@ -54,7 +52,7 @@ func runExplain(appName string, configArgs []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	entries := collectConfigEntries(loader)
+	entries := loader.Explain()
 
 	if len(entries) == 0 {
 		fmt.Println("No configuration values loaded")
@@ -66,91 +64,7 @@ func runExplain(appName string, configArgs []string) error {
 	return nil
 }
 
-type configEntry struct {
-	path   string
-	value  string
-	source string
-}
-
-func collectConfigEntries(loader *orale.Loader) []configEntry {
-	seen := make(map[string]bool)
-	var entries []configEntry
-
-	for path, values := range loader.FlagValues {
-		if seen[path] {
-			continue
-		}
-		seen[path] = true
-
-		value := formatValue(values)
-		entries = append(entries, configEntry{
-			path:   path,
-			value:  value,
-			source: "flag",
-		})
-	}
-
-	for path, values := range loader.EnvironmentValues {
-		if seen[path] {
-			continue
-		}
-		seen[path] = true
-
-		value := formatValue(values)
-		entries = append(entries, configEntry{
-			path:   path,
-			value:  value,
-			source: "environment",
-		})
-	}
-
-	for _, file := range loader.ConfigurationFiles {
-		for path, values := range file.Values {
-			if seen[path] {
-				continue
-			}
-			seen[path] = true
-
-			value := formatValue(values)
-			relPath := file.Path
-			if workingDir, err := os.Getwd(); err == nil {
-				if rel, err := filepath.Rel(workingDir, file.Path); err == nil {
-					relPath = rel
-				}
-			}
-
-			entries = append(entries, configEntry{
-				path:   path,
-				value:  value,
-				source: relPath,
-			})
-		}
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].path < entries[j].path
-	})
-
-	return entries
-}
-
-func formatValue(values []any) string {
-	if len(values) == 0 {
-		return ""
-	}
-
-	if len(values) == 1 {
-		return fmt.Sprintf("%v", values[0])
-	}
-
-	strValues := make([]string, len(values))
-	for i, v := range values {
-		strValues[i] = fmt.Sprintf("%v", v)
-	}
-	return "[" + strings.Join(strValues, ", ") + "]"
-}
-
-func printTable(entries []configEntry) {
+func printTable(entries []orale.ExplainEntry) {
 	headers := []string{"PATH", "VALUE", "SOURCE"}
 	colWidths := calculateColumnWidths(entries, headers)
 
@@ -159,25 +73,25 @@ func printTable(entries []configEntry) {
 	printSeparator(colWidths)
 
 	for _, entry := range entries {
-		row := []string{entry.path, entry.value, entry.source}
+		row := []string{entry.Path, entry.Value, entry.Source}
 		printRow(row, colWidths)
 	}
 
 	printSeparator(colWidths)
 }
 
-func calculateColumnWidths(entries []configEntry, headers []string) []int {
+func calculateColumnWidths(entries []orale.ExplainEntry, headers []string) []int {
 	widths := []int{len(headers[0]), len(headers[1]), len(headers[2])}
 
 	for _, entry := range entries {
-		if len(entry.path) > widths[0] {
-			widths[0] = len(entry.path)
+		if len(entry.Path) > widths[0] {
+			widths[0] = len(entry.Path)
 		}
-		if len(entry.value) > widths[1] {
-			widths[1] = len(entry.value)
+		if len(entry.Value) > widths[1] {
+			widths[1] = len(entry.Value)
 		}
-		if len(entry.source) > widths[2] {
-			widths[2] = len(entry.source)
+		if len(entry.Source) > widths[2] {
+			widths[2] = len(entry.Source)
 		}
 	}
 

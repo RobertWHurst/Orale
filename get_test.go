@@ -935,10 +935,10 @@ func Test_Get_missingValuesDoNotError(t *testing.T) {
 	}
 
 	type Config struct {
-		Port    int    `config:"port"`
-		Host    string `config:"host"`
-		Debug   bool   `config:"debug"`
-		Timeout int64  `config:"timeout"`
+		Port    int     `config:"port"`
+		Host    string  `config:"host"`
+		Debug   bool    `config:"debug"`
+		Timeout int64   `config:"timeout"`
 		Ratio   float64 `config:"ratio"`
 	}
 
@@ -1116,5 +1116,39 @@ func Test_Get_encryptedDefaultValue_fallbackToEmptyWhenDecryptionFails(t *testin
 
 	if config.Password != "" {
 		t.Errorf("Password = %q, want empty string when decryption fails", config.Password)
+	}
+}
+
+func Test_Get_registersSecretPaths(t *testing.T) {
+	l, _ := orale.LoadFromValues([]string{}, "", []string{}, "", []string{})
+	l.FlagValues = map[string][]any{
+		"database.password": {"secret-password"},
+		"apiKey":            {"secret-api-key"},
+	}
+
+	type Config struct {
+		Database struct {
+			Password string `config:"password" secret:"true"`
+		} `config:"database"`
+		APIKey string `config:"apiKey" secret:"true"`
+	}
+
+	var config Config
+	err := l.GetAll(&config)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if config.Database.Password != "secret-password" {
+		t.Errorf("Database.Password = %q, want secret-password", config.Database.Password)
+	}
+	if config.APIKey != "secret-api-key" {
+		t.Errorf("APIKey = %q, want secret-api-key", config.APIKey)
+	}
+	if !l.SecretPaths["database.password"] {
+		t.Error("SecretPaths[database.password] = false, want true")
+	}
+	if !l.SecretPaths["apiKey"] {
+		t.Error("SecretPaths[apiKey] = false, want true")
 	}
 }

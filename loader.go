@@ -10,6 +10,9 @@ type Loader struct {
 	EnvironmentValues map[string][]any
 	// ConfigurationFiles is a slice of configuration files.
 	ConfigurationFiles []*File
+	// SecretPaths is a set of config paths that should be masked in explain
+	// output. Paths are registered from struct fields tagged `secret:"true"`.
+	SecretPaths map[string]bool
 	// expandTargets is used to detect circular variable expansion.
 	expandTargets map[string]struct{}
 	// expandCache caches expanded values for performance.

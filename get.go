@@ -132,6 +132,9 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 					// If no 'config' tag, use currentPath (fields are promoted)
 					embeddedPath = currentPath
 				}
+				if structField.Tag.Get("secret") == "true" {
+					markSecretPath(l, embeddedPath)
+				}
 				// Recursively process the embedded struct
 				if err := getFromLoader(l, embeddedPath, field, 0); err != nil {
 					return err
@@ -148,6 +151,9 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 				fieldPath = currentPath + "." + fieldTag
 			} else {
 				fieldPath = fieldTag
+			}
+			if structField.Tag.Get("secret") == "true" {
+				markSecretPath(l, fieldPath)
 			}
 			if err := getFromLoader(l, fieldPath, field, 0); err != nil {
 				return err
@@ -314,6 +320,16 @@ func getFromLoader(l *Loader, currentPath string, targetRefVal reflect.Value, in
 		return fmt.Errorf("unsupported type %s", targetRefVal.Kind())
 	}
 	return nil
+}
+
+func markSecretPath(l *Loader, path string) {
+	if path == "" {
+		return
+	}
+	if l.SecretPaths == nil {
+		l.SecretPaths = map[string]bool{}
+	}
+	l.SecretPaths[path] = true
 }
 
 func resolveValue(l *Loader, targetPath string) ([]any, error) {
